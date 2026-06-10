@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Survey Synthetic Data</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<!-- link-unfurl / social preview (Slack, WhatsApp, etc.) -->
+<meta name="description" content="AI answers extra survey questions on behalf of your real respondents — preview and export in seconds." />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="AIM · Market Research" />
+<meta property="og:url" content="https://syntheticdata.ddns.net/" />
+<meta property="og:title" content="Survey Synthetic Data" />
+<meta property="og:description" content="AI answers extra survey questions on behalf of your real respondents — preview and export in seconds." />
+<meta property="og:image" content="https://syntheticdata.ddns.net/static/og.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Survey Synthetic Data — AIM Market Research" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Survey Synthetic Data" />
+<meta name="twitter:description" content="AI answers extra survey questions on behalf of your real respondents — preview and export in seconds." />
+<meta name="twitter:image" content="https://syntheticdata.ddns.net/static/og.png" />
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0D10'/%3E%3Ctext x='16' y='24' font-size='22' text-anchor='middle' fill='%23D4AF37' font-family='Georgia,serif'%3E%E2%88%BF%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo">∿</span>
+    <div>
+      <h1>Survey Synthetic Data</h1>
+      <p class="tagline">Generate AI answers for survey respondents and export them — live from the database</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="card" id="step-survey">
+    <h2><span class="step">1</span> Pick a survey</h2>
+    <div class="row">
+      <input id="survey-search" placeholder="search surveys by name…" />
+      <span class="meta" id="survey-search-meta"></span>
+    </div>
+    <div id="survey-list" class="grid"></div>
+  </section>
+
+  <section class="card hidden" id="step-filter">
+    <h2><span class="step">2</span> Filter respondents</h2>
+    <p class="hint">Only <strong>submitted</strong>, non-excluded respondents are included. Optionally narrow by submit date.</p>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label>From</label>
+        <input id="date-from" type="date" />
+      </div>
+      <div class="filter-group">
+        <label>To</label>
+        <input id="date-to" type="date" />
+      </div>
+      <label class="chk"><input type="checkbox" id="include-all" /> include all dates</label>
+      <span class="meta" id="eligible-meta"></span>
+      <button id="apply-filter-btn" class="primary">Apply</button>
+    </div>
+  </section>
+
+  <section class="card hidden" id="step-questions">
+    <h2><span class="step">3</span> Choose questions</h2>
+    <p class="hint">Generate questions the AI can confidently answer from existing responses, and/or write your own.
+      Tick the ones to include. Click “Generate with AI” again to add more.</p>
+    <div id="question-list"></div>
+    <div class="row" style="margin-top: 12px;">
+      <button id="add-q-btn" class="ghost">+ Add question</button>
+      <button id="suggest-btn" class="ghost">✨ Generate with AI</button>
+      <select id="suggest-count" title="How many to generate">
+        <option value="3">3</option>
+        <option value="5" selected>5</option>
+        <option value="8">8</option>
+        <option value="12">12</option>
+      </select>
+      <span style="flex: 1"></span>
+      <button id="preview-btn" class="primary">Preview on 10 →</button>
+    </div>
+  </section>
+
+  <section class="card hidden" id="step-preview">
+    <h2><span class="step">4</span> Preview — sample of 10</h2>
+    <div id="preview-meta" class="hint"></div>
+    <div id="preview-area"></div>
+  </section>
+
+  <section class="card hidden" id="step-generate">
+    <h2><span class="step">5</span> Generate for all respondents</h2>
+    <p class="hint">Runs the included questions across the filtered cohort (capped for cost) and produces a
+      raw-data Excel: every respondent with their real answers + the AI-generated answers.</p>
+    <div class="row">
+      <button id="generate-btn" class="primary">Generate Answers for All Respondents →</button>
+      <span class="meta" id="generate-meta"></span>
+    </div>
+    <div id="progress-area"></div>
+  </section>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
