@@ -1,0 +1,31 @@
+services:
+  survey-intelligence:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: survey_intelligence
+    environment:
+      - "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}"
+      - "SURVEY_MONGO_URL=${SURVEY_MONGO_URL}"
+      - "SURVEY_MONGO_DB=${SURVEY_MONGO_DB}"
+      - "ANTHROPIC_MODEL=${ANTHROPIC_MODEL}"
+      - "MAX_GENERATE_RESPONDENTS=${MAX_GENERATE_RESPONDENTS}"
+      - "SEGMENTATION_MODEL=${SEGMENTATION_MODEL}"
+      - "FALLBACK_MODEL=${FALLBACK_MODEL}"
+      - "MAX_TURNS=${MAX_TURNS}"
+      - "MAX_BUDGET_USD=${MAX_BUDGET_USD}"
+      - "RUN_TIMEOUT_SECONDS=${RUN_TIMEOUT_SECONDS}"
+      - "MAX_CONCURRENT_RUNS=${MAX_CONCURRENT_RUNS}"
+      - "PORT_NUMBER=${PORT_NUMBER}"
+      - "DEV_MODE=${DEV_MODE}"
+    restart: always
+    mem_limit: 4G
+    mem_reservation: 1G
+    ports:
+      - "${PORT_NUMBER}:${PORT_NUMBER}"
+    volumes:
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+      - ./runs:/app/runs
+      - ./exports:/app/exports
+      - ./tracking:/app/tracking

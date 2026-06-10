@@ -14,9 +14,9 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 
-from . import data
+from services import data
 
-EXPORTS_DIR = Path(__file__).parent / "exports"
+EXPORTS_DIR = Path(__file__).resolve().parents[2] / "exports"
 
 
 def _join_real(entry: dict) -> str:

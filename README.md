@@ -1,70 +1,87 @@
-# Survey Synthetic Data — v2 (live from MongoDB)
+# Survey Intelligence
 
-A web tool that, for any survey in the `research` database, lets you:
+A web tool over the `research` MongoDB with **two tabs**:
 
-1. **Search & pick a survey** by name (live query).
-2. **Filter & pick a respondent** (status, answered-count range, id search).
-3. **Generate questions for the survey with AI** (or compose your own) and have AI
-   **answer them as the selected respondent**, grounded in that respondent's real answers.
+1. **Synthetic Data** — for any survey, generate AI answers to *new* questions on behalf of
+   real respondents (grounded in their actual answers), preview on a sample, and export the
+   whole cohort to Excel.
+2. **Segmentation** — pick a survey (or upload an Excel), choose question labels, and an AI
+   analyst (Anthropic **Agent SDK**) autonomously writes & runs pandas to build audience
+   **personas**, producing a client-ready **HTML report + PowerPoint**.
 
-Unlike v1, this version reads **directly from MongoDB** — there is no export step and no
-JSON files on disk. The "hide a question and predict it" feature from v1 has been removed.
+Both tabs share one survey/respondent data layer and one Anthropic key.
 
 ## Architecture
 
-- **Backend:** FastAPI (`app/server.py`) + pymongo data layer (`app/data.py`).
-- **AI:** Anthropic Claude (`app/predictor.py`) — `suggest_questions` + `ask_ad_hoc`.
-- **Frontend:** vanilla HTML/JS/CSS (`app/static/`), no build step.
+- **Backend:** FastAPI (`src/server.py`) + a pymongo data layer (`src/services/data.py`).
+- **Structure:** uv-managed, `src/{config,models,routes,services,utils}`, run from `src/`
+  (bare absolute imports).
+- **Synthetic data:** raw Anthropic API (`src/services/predictor.py`), threaded jobs →
+  Excel (`src/services/synth_jobs.py`, `excelout.py`). Endpoints under `/api/*`.
+- **Segmentation:** `claude-agent-sdk` agent in a per-run sandbox
+  (`src/services/segmentation_agent.py`), Mongo→Excel export reusing the shared data layer
+  (`segmentation_export.py`), in-memory run registry (`job_registry.py`). Endpoints under
+  `/api/segmentation/*`.
+- **Frontend:** vanilla HTML/JS/CSS (`src/static/`): `app.js` (synthetic data) + `seg.js`
+  (tabs + segmentation), no build step.
 
-Database: `research` (collections `surveys`, `sections`, `respondents`). A survey links to
-respondents via `respondents.surveyId == surveys._id`; questions come from the survey's
-ordered `sections`.
+Database `research`: a survey links to respondents via `respondents.surveyId == surveys._id`;
+questions come from the survey's ordered `sections`. The eligible cohort everywhere is
+**status == submitted AND exclude empty**.
 
 ## Setup
 
+Requires **Python 3.13**, [`uv`](https://docs.astral.sh/uv/), and **Node.js** (the
+segmentation Agent SDK drives the bundled Claude Code CLI).
+
 ```bash
 cd /data/survey_synthetic_data_v2
-pip install -r requirements.txt
+uv sync
+cp .env.example .env      # then fill in ANTHROPIC_API_KEY + SURVEY_MONGO_URL
 ```
-
-Provide your Anthropic key and the Mongo URL (model is optional). Either export them:
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-export SURVEY_MONGO_URL=mongodb://user:password@host:port/research
-# optional:
-export ANTHROPIC_MODEL=claude-opus-4-7
-```
-
-…or copy `.env.example` to `app/.env` (it is loaded automatically on startup).
 
 ## Run
 
 ```bash
-python3 -m uvicorn app.server:app --host 127.0.0.1 --port 8766
+# dev (run from inside src/ so bare imports resolve)
+cd src && uv run uvicorn server:app --reload --port 8766
+
+# production
+cd src && uv run gunicorn --config utils/gunicorn_utils/gunicorn_config.py server:app
 ```
 
-Then open <http://127.0.0.1:8766>.
+Open <http://localhost:8766>.
+
+### Docker
+
+```bash
+docker compose up --build      # requires ANTHROPIC_API_KEY + SURVEY_MONGO_URL in the environment
+```
 
 ## API
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/surveys?search=&limit=` | List/search surveys by name |
-| GET | `/api/surveys/{id}` | Survey detail + flattened questions |
-| GET | `/api/surveys/{id}/respondents-meta` | Status histogram, min/max answers, total |
-| GET | `/api/surveys/{id}/respondents?status=&min_answers=&max_answers=&limit=` | Filtered random sample |
-| GET | `/api/surveys/{id}/respondents/{rid}` | One respondent's answers |
-| POST | `/api/suggest` `{survey_id, n}` | AI-generate new questions for the survey |
-| POST | `/api/ask` `{survey_id, respondent_id, questions[]}` | AI answers as the respondent |
+| Method | Path | Tab | Purpose |
+|--------|------|-----|---------|
+| GET | `/api/surveys?search=&limit=` | both | list/search surveys |
+| GET | `/api/surveys/{id}` | synth | survey detail + flattened questions |
+| GET | `/api/surveys/{id}/respondents*` | synth | respondent filtering / meta / detail |
+| POST | `/api/suggest` `/api/ask` | synth | AI suggest questions / answer as respondent |
+| POST | `/api/eligible-count` `/api/preview` `/api/generate-all` | synth | cohort flow |
+| GET | `/api/jobs/{id}` `/api/jobs/{id}/download` | synth | generate-all job + Excel |
+| GET | `/api/segmentation/surveys/{id}` | seg | counts + candidate question labels |
+| POST | `/api/segmentation/upload` | seg | inspect an uploaded Excel |
+| POST | `/api/segmentation/runs` | seg | start a segmentation run → job_id |
+| GET | `/api/segmentation/runs/{id}?since=` | seg | poll status + progress |
+| GET | `/api/segmentation/runs/{id}/report` `/pptx` | seg | the HTML report / PowerPoint |
 
-## Notes
+## Notes / limitations (prototype)
 
-- `respondents-meta` and respondent filtering scan a survey's respondents (the answered-count
-  is computed with `$size`, which can't be indexed). `respondents-meta` is cached for 60s.
-  An index on `respondents.surveyId` (ideally `{surveyId:1, status:1}`) keeps the initial
-  `$match` fast — confirm it exists for large surveys.
-- Survey docs, sections, and flattened questions are cached in-process; restart the server
-  to pick up survey-definition edits.
-- The connection string is required via `SURVEY_MONGO_URL` (the server raises a clear error if it
-  is unset). Set it (and the API key) via env/`.env` — never commit secrets.
+- **In-memory state** (synth jobs + segmentation runs) → run gunicorn with `workers=1`;
+  jobs are lost on restart.
+- The segmentation agent executes model-written code in the **same venv**, sandboxed to its
+  `runs/<id>/` directory with web tools disabled; the report renders in a sandboxed iframe.
+- Auth: locally the Agent SDK can reuse a logged-in `claude` CLI session; with
+  `ANTHROPIC_API_KEY` set (recommended, and required in Docker) both features use the key.
+- Segmentation cost/latency: an Opus run with `effort=high` + two deliverables takes minutes
+  and a few dollars; bounded by `MAX_TURNS`, `MAX_BUDGET_USD`, `RUN_TIMEOUT_SECONDS`. Use
+  `SEGMENTATION_MODEL=claude-sonnet-4-6` to iterate faster.

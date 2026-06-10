@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 _LOCK = threading.Lock()
-_PATH = Path(__file__).parent / "tracking" / "events.jsonl"
+_PATH = Path(__file__).resolve().parents[2] / "tracking" / "events.jsonl"
 
 
 def _now_iso() -> str:

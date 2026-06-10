@@ -1,0 +1,27 @@
+[project]
+name = "survey-intelligence"
+version = "1.0.0"
+description = "Survey Intelligence — synthetic respondent answers + audience segmentation, live from MongoDB"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    # web
+    "fastapi>=0.128.0",
+    "uvicorn[standard]>=0.40.0",
+    "gunicorn>=25.0.1",
+    "python-multipart>=0.0.9",
+    "python-dotenv>=1.2.1",
+    "pydantic>=2.0",
+    # data / db
+    "pymongo>=4.17",
+    "openpyxl>=3.1.5",
+    "pandas>=2.2",
+    "numpy>=2.0",
+    # synthetic-data feature (raw Anthropic API)
+    "anthropic>=0.40",
+    # segmentation feature (agent that writes & runs its own code)
+    "claude-agent-sdk>=0.2.94",
+    "python-pptx>=1.0.0",
+    "matplotlib>=3.9",
+    "scikit-learn>=1.5",
+]

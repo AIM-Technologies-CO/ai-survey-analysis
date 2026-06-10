@@ -1,5 +1,18 @@
 __pycache__/
 *.pyc
+
+# Secrets / env
+.env
 app/.env
+
+# Virtual env (uv)
+.venv
+
+# Runtime artifacts
+logs/
+uploads/
+runs/
+exports/
+tracking/
 app/exports/
 app/tracking/

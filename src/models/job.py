@@ -1,0 +1,35 @@
+"""Models for the segmentation run/job lifecycle."""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+from models.segmentation import ProgressEvent
+
+
+class RunRequest(BaseModel):
+    source: Literal["mongo", "upload"] = Field(description="Where the survey data comes from")
+    ref: str = Field(description="survey_id (mongo) or upload_id (upload)")
+    segment_by: list[str] = Field(default_factory=list, description="Question labels to segment by")
+    additional_details: str = Field(default="", description="Free-text guidance for the agent")
+
+
+class JobCreatedResponse(BaseModel):
+    job_id: str
+    status: str
+    status_url: str
+
+
+class JobStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    events: list[ProgressEvent] = Field(default_factory=list)
+    error: str | None = None
+    cost_usd: float | None = None
+    num_turns: int = 0
+    report_url: str | None = None
+    pptx_url: str | None = None
+    created_at: float
+    updated_at: float

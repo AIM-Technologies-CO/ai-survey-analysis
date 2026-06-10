@@ -8,7 +8,7 @@ from typing import Any
 
 import anthropic
 
-from .data import QuestionMeta, get_question, get_survey_questions, respondent_answers_by_qid
+from services.data import QuestionMeta, get_question, get_survey_questions, respondent_answers_by_qid
 
 MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-7")
 MAX_TOKENS = 1500
@@ -160,7 +160,7 @@ def suggest_questions(survey_id: str, n: int = 5, already: list[str] | None = No
     earlier "Generate with AI" clicks). We feed them to Claude so it avoids re-proposing
     or lightly rewording them, and dedupe defensively against them afterwards.
     """
-    from .data import get_survey  # local import to avoid cycle at module load
+    from services.data import get_survey  # local import to avoid cycle at module load
     survey = get_survey(survey_id)
     survey_name = survey.get("name", "")
     existing_block, _ = _existing_questions_block(survey_id)

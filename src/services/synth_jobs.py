@@ -12,7 +12,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from . import data, excelout, predictor, tracking
+from services import data, excelout, predictor, tracking
 
 # ---- cost controls --------------------------------------------------------
 MAX_GENERATE_RESPONDENTS = int(os.environ.get("MAX_GENERATE_RESPONDENTS", "50"))

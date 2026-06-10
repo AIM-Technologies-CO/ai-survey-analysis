@@ -1,210 +1,27 @@
-"""FastAPI server for the synthetic-data app (v2 — live MongoDB)."""
+"""Synthetic-data endpoints: AI suggests/answers questions for real respondents,
+preview on a sample, and generate-all → Excel. Ported from the original app."""
+
 from __future__ import annotations
 
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import timedelta
-from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pymongo.errors import PyMongoError
 
+from services import data, predictor, tracking
+from services import synth_jobs as jobs
 
-# Load .env (next to this file) before importing the predictor so the
-# anthropic client picks up the key when it lazy-inits.
-def _load_dotenv():
-    env_path = Path(__file__).parent / ".env"
-    if not env_path.exists():
-        return
-    for line in env_path.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, _, v = line.partition("=")
-        k, v = k.strip(), v.strip().strip('"').strip("'")
-        if k and k not in os.environ:
-            os.environ[k] = v
-
-_load_dotenv()
-
-from . import data, jobs, predictor, tracking  # noqa: E402
-
-APP_DIR = Path(__file__).parent
-STATIC_DIR = APP_DIR / "static"
-
-app = FastAPI(title="Survey Synthetic Data (live)")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+router = APIRouter(prefix="/api", tags=["synthetic-data"])
 
 
-# ---------- error mapping --------------------------------------------------
+# ---------- helpers --------------------------------------------------------
 
 def _db_guard(exc: Exception):
-    """Map a Mongo failure to a 503 without leaking the connection string."""
     raise HTTPException(503, "database unavailable") from exc
-
-
-# ---------- routes ---------------------------------------------------------
-
-@app.get("/api/surveys")
-def list_surveys(
-    search: str | None = Query(None),
-    limit: int = Query(50, ge=1, le=200),
-):
-    try:
-        return [s.__dict__ for s in data.list_surveys(search=search, limit=limit)]
-    except PyMongoError as e:
-        _db_guard(e)
-
-
-@app.get("/api/surveys/{survey_id}")
-def get_survey(survey_id: str):
-    try:
-        survey = data.get_survey(survey_id)
-        qs = data.get_survey_questions(survey_id)
-    except KeyError:
-        raise HTTPException(404, "survey not found")
-    except PyMongoError as e:
-        _db_guard(e)
-    return {
-        "id": survey_id,
-        "name": survey.get("name"),
-        "questions": [q.to_dict() for q in qs],
-    }
-
-
-@app.get("/api/surveys/{survey_id}/respondents")
-def list_respondents(
-    survey_id: str,
-    limit: int = Query(50, ge=1, le=500),
-    seed: int | None = None,
-    min_answers: int | None = None,
-    max_answers: int | None = None,
-    status: list[str] | None = Query(None),
-):
-    try:
-        rows = data.filter_respondents(
-            survey_id,
-            min_answers=min_answers,
-            max_answers=max_answers,
-            status=status,
-            n=limit,
-            seed=seed,
-        )
-    except KeyError:
-        raise HTTPException(404, "survey not found")
-    except PyMongoError as e:
-        _db_guard(e)
-    return [
-        {"_id": r["id"], "status": r["status"], "answered_count": r["answered_count"]}
-        for r in rows
-    ]
-
-
-@app.get("/api/surveys/{survey_id}/respondents-meta")
-def respondents_meta(survey_id: str):
-    try:
-        return data.respondents_meta(survey_id)
-    except KeyError:
-        raise HTTPException(404, "survey not found")
-    except PyMongoError as e:
-        _db_guard(e)
-
-
-@app.get("/api/surveys/{survey_id}/respondents/{respondent_id}")
-def get_respondent(survey_id: str, respondent_id: str):
-    try:
-        r = data.get_respondent(survey_id, respondent_id)
-    except KeyError:
-        raise HTTPException(404, "respondent not found")
-    except PyMongoError as e:
-        _db_guard(e)
-    # Strip heavy fields not needed in UI; serialize BSON (datetime/ObjectId) safely.
-    payload = {
-        "_id": respondent_id,
-        "status": r.get("status"),
-        "submitDate": r.get("submitDate"),
-        "country": r.get("countryName"),
-        "language": r.get("language"),
-        "answered_count": len(r.get("questions", []) or []),
-        "answers": [
-            {
-                "sqlQuestionId": q.get("sqlQuestionId"),
-                "header": q.get("header"),
-                "label": q.get("label"),
-                "type": q.get("type"),
-                "answers": [
-                    {"value": a.get("value"), "answer": a.get("answer"), "position": a.get("position")}
-                    for a in (q.get("answers") or [])
-                ],
-            }
-            for q in r.get("questions", []) or []
-        ],
-    }
-    return data.jsonable(payload)
-
-
-class SuggestRequest(BaseModel):
-    survey_id: str
-    n: int = 5
-    already: list[str] = []  # question texts already in the builder, to avoid duplicating
-
-
-@app.post("/api/suggest")
-def suggest(req: SuggestRequest):
-    try:
-        data.get_survey(req.survey_id)
-    except KeyError:
-        raise HTTPException(404, "survey not found")
-    except PyMongoError as e:
-        _db_guard(e)
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise HTTPException(500, "ANTHROPIC_API_KEY env var is not set.")
-    n = max(1, min(req.n, 12))
-    try:
-        return predictor.suggest_questions(req.survey_id, n=n, already=req.already)
-    except Exception as e:
-        raise HTTPException(500, f"LLM call failed: {type(e).__name__}: {e}")
-
-
-class AskRequest(BaseModel):
-    survey_id: str
-    respondent_id: str
-    questions: list[dict]   # [{id, text, type, options?}]
-
-
-@app.post("/api/ask")
-def ask(req: AskRequest):
-    try:
-        respondent = data.get_respondent(req.survey_id, req.respondent_id)
-    except KeyError:
-        raise HTTPException(404, "respondent not found")
-    except PyMongoError as e:
-        _db_guard(e)
-
-    cleaned = _clean_questions(req.questions)
-    _require_key()
-    try:
-        result = predictor.ask_ad_hoc(req.survey_id, respondent, cleaned)
-    except Exception as e:
-        raise HTTPException(500, f"LLM call failed: {type(e).__name__}: {e}")
-    return result
-
-
-# ---------- PRD cohort flow: filter / preview / generate-all / track -------
-
-class FilterSpec(BaseModel):
-    date_from: str | None = None
-    date_to: str | None = None
-    include_all: bool = False
 
 
 def _require_key():
@@ -213,7 +30,6 @@ def _require_key():
 
 
 def _clean_questions(questions: list[dict]) -> list[dict]:
-    """Validate + normalize the researcher's question set (shared by ask/preview/generate)."""
     if not questions:
         raise HTTPException(400, "questions list is empty")
     cleaned = []
@@ -231,14 +47,18 @@ def _clean_questions(questions: list[dict]) -> list[dict]:
     return cleaned
 
 
+class FilterSpec(BaseModel):
+    date_from: str | None = None
+    date_to: str | None = None
+    include_all: bool = False
+
+
 def _filter_kwargs(f: FilterSpec) -> dict:
-    """Parse a FilterSpec into data-layer kwargs (naive-UTC datetimes)."""
     try:
         df = data.parse_submit_date(f.date_from)
         dt = data.parse_submit_date(f.date_to)
     except ValueError as e:
         raise HTTPException(400, f"bad date: {e}")
-    # a date-only `date_to` (YYYY-MM-DD) is inclusive of that whole day
     if dt is not None and f.date_to and len(f.date_to.strip()) <= 10:
         dt = dt + timedelta(days=1) - timedelta(microseconds=1)
     return {"date_from": df, "date_to": dt, "include_all": f.include_all}
@@ -269,15 +89,50 @@ def _shape_preview_row(survey_id: str, doc: dict, generated_answers: list, error
     }
 
 
-@app.get("/api/surveys/{survey_id}/date-bounds")
-def date_bounds(survey_id: str):
+# ---------- routes ---------------------------------------------------------
+
+class SuggestRequest(BaseModel):
+    survey_id: str
+    n: int = 5
+    already: list[str] = []
+
+
+@router.post("/suggest")
+def suggest(req: SuggestRequest):
     try:
-        data.get_survey(survey_id)
-        return data.submit_date_bounds(survey_id)
+        data.get_survey(req.survey_id)
     except KeyError:
         raise HTTPException(404, "survey not found")
     except PyMongoError as e:
         _db_guard(e)
+    _require_key()
+    n = max(1, min(req.n, 12))
+    try:
+        return predictor.suggest_questions(req.survey_id, n=n, already=req.already)
+    except Exception as e:
+        raise HTTPException(500, f"LLM call failed: {type(e).__name__}: {e}")
+
+
+class AskRequest(BaseModel):
+    survey_id: str
+    respondent_id: str
+    questions: list[dict]
+
+
+@router.post("/ask")
+def ask(req: AskRequest):
+    try:
+        respondent = data.get_respondent(req.survey_id, req.respondent_id)
+    except KeyError:
+        raise HTTPException(404, "respondent not found")
+    except PyMongoError as e:
+        _db_guard(e)
+    cleaned = _clean_questions(req.questions)
+    _require_key()
+    try:
+        return predictor.ask_ad_hoc(req.survey_id, respondent, cleaned)
+    except Exception as e:
+        raise HTTPException(500, f"LLM call failed: {type(e).__name__}: {e}")
 
 
 class EligibleCountRequest(BaseModel):
@@ -286,7 +141,7 @@ class EligibleCountRequest(BaseModel):
     session_id: str | None = None
 
 
-@app.post("/api/eligible-count")
+@router.post("/eligible-count")
 def eligible_count(req: EligibleCountRequest):
     try:
         data.get_survey(req.survey_id)
@@ -312,7 +167,7 @@ class PreviewRequest(BaseModel):
     session_id: str | None = None
 
 
-@app.post("/api/preview")
+@router.post("/preview")
 def preview(req: PreviewRequest):
     try:
         data.get_survey(req.survey_id)
@@ -347,8 +202,6 @@ def preview(req: PreviewRequest):
                 results[i] = row
                 usages[i] = usage
 
-    # Sum the real token cost of this 10-respondent run; per-respondent average lets the
-    # client estimate the full generate-all run before it's launched.
     scored = [u for u in usages if u]
     total_in = sum(u.get("input_tokens", 0) for u in scored)
     total_out = sum(u.get("output_tokens", 0) for u in scored)
@@ -382,7 +235,7 @@ class GenerateAllRequest(BaseModel):
     session_id: str | None = None
 
 
-@app.post("/api/generate-all")
+@router.post("/generate-all")
 def generate_all(req: GenerateAllRequest):
     try:
         data.get_survey(req.survey_id)
@@ -409,7 +262,7 @@ def generate_all(req: GenerateAllRequest):
     return view
 
 
-@app.get("/api/jobs/{job_id}")
+@router.get("/jobs/{job_id}")
 def job_status(job_id: str):
     job = jobs.get_job(job_id)
     if not job:
@@ -417,7 +270,7 @@ def job_status(job_id: str):
     return jobs._public(job)
 
 
-@app.get("/api/jobs/{job_id}/download")
+@router.get("/jobs/{job_id}/download")
 def job_download(job_id: str):
     job = jobs.get_job(job_id)
     if not job:
@@ -425,8 +278,7 @@ def job_download(job_id: str):
     if job["state"] != "done" or not job.get("file"):
         raise HTTPException(409, f"job not ready (state={job['state']})")
     return FileResponse(
-        job["file"],
-        filename=job["filename"],
+        job["file"], filename=job["filename"],
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
@@ -438,21 +290,7 @@ class TrackEvent(BaseModel):
     payload: dict = {}
 
 
-@app.post("/api/track")
+@router.post("/track")
 def track(ev: TrackEvent):
     tracking.log(ev.session_id, ev.survey_id, ev.action, ev.payload)
     return {"ok": True}
-
-
-# ---------- static UI ------------------------------------------------------
-
-if STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-
-
-@app.get("/")
-def root():
-    idx = STATIC_DIR / "index.html"
-    if idx.exists():
-        return FileResponse(str(idx))
-    return {"ok": True, "hint": "static UI not found"}

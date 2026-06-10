@@ -1,0 +1,90 @@
+"""Convert a survey's usable respondents into the flat survey.xlsx the agent analyzes.
+
+Reuses the shared Mongo data layer (services/data.py). "Usable" = the PRD cohort:
+status == 'submitted' AND exclude empty (False / null / missing). One row per
+respondent; one column per question label (answers joined); metadata columns kept.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pandas as pd
+
+from config import settings
+from services import data
+from utils.logging_config.logger import get_logger
+
+logger = get_logger()
+
+_META_COLS = ["respondentId", "status", "submitDate"]
+
+
+def _extract_answer(question: dict) -> str:
+    parts: list[str] = []
+    for ans in question.get("answers", []) or []:
+        if not isinstance(ans, dict):
+            parts.append(str(ans))
+            continue
+        v = ans.get("answer") or ans.get("value") or ans.get("header")
+        if v not in (None, ""):
+            parts.append(str(v))
+    return "; ".join(parts)
+
+
+def build_data_dictionary(survey_id: str) -> dict[str, str]:
+    """label -> full question text, from the survey definition (for DATA_DICTIONARY.md)."""
+    out: dict[str, str] = {}
+    try:
+        for q in data.get_survey_questions(survey_id):
+            if q.label and q.text:
+                out[q.label] = q.text
+    except Exception:
+        logger.exception("data dictionary build failed for %s", survey_id)
+    return out
+
+
+def export_survey_to_xlsx(survey_id: str, dest_path: str | Path) -> dict:
+    """Write usable respondents of a survey to a flat Excel at dest_path."""
+    db = data.get_db()
+    match = data._eligible_match(survey_id, include_all=True)
+    projection = {"_id": 1, "status": 1, "submitDate": 1, "questions": 1}
+
+    cap = settings.segmentation_row_cap
+    cursor = db.respondents.find(match, projection)
+    if cap and cap > 0:
+        cursor = cursor.limit(cap)
+
+    ordered_labels: list[str] = []
+    rows: list[dict] = []
+    for r in cursor:
+        row: dict = {
+            "respondentId": str(r.get("_id", "")),
+            "status": r.get("status"),
+            "submitDate": data.jsonable(r.get("submitDate")),
+        }
+        for q in r.get("questions", []) or []:
+            label = q.get("label") or q.get("header")
+            if not label or label in _META_COLS:
+                continue
+            ans = _extract_answer(q)
+            if label in row:
+                if ans:
+                    row[label] = f"{row[label]}; {ans}".strip("; ") if row[label] else ans
+            else:
+                row[label] = ans
+                if label not in ordered_labels:
+                    ordered_labels.append(label)
+        rows.append(row)
+
+    columns = _META_COLS + ordered_labels
+    df = pd.DataFrame(rows).reindex(columns=columns)
+    dest = Path(dest_path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    df.to_excel(dest, index=False, engine="openpyxl")
+
+    logger.info(
+        "segmentation export %s -> %s (%d rows, %d label columns)",
+        survey_id, dest, len(rows), len(ordered_labels),
+    )
+    return {"rows": len(rows), "labels": ordered_labels, "columns": columns}
