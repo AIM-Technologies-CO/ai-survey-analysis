@@ -25,7 +25,7 @@ from claude_agent_sdk import (
 from config import settings
 from models.segmentation import ProgressEvent, RunStatus, SegmentationResult
 from services import run_workspace
-from services.prompts import SYSTEM_APPEND, build_task_prompt
+from services.prompts import SYSTEM_APPEND, build_agent_definitions, build_task_prompt
 from utils.audit import AuditTrail
 from utils.logging_config.logger import get_logger
 
@@ -44,6 +44,8 @@ def _summarize_tool_input(name: str | None, ti: dict) -> str:
         return f"{name}: {ti.get('file_path', '')}"
     if name in ("Glob", "Grep"):
         return f"{name}: {ti.get('pattern', '')}"
+    if name in ("Agent", "Task"):
+        return f"Builder agent launched: {ti.get('subagent_type', '?')}"
     return f"{name}: {str(ti)[:120]}"
 
 
@@ -120,8 +122,9 @@ async def run_segmentation(
         add_dirs=[],
         setting_sources=[],
         system_prompt={"type": "preset", "preset": "claude_code", "append": SYSTEM_APPEND},
-        allowed_tools=["Bash", "Read", "Write", "Edit", "Glob", "Grep"],
+        allowed_tools=["Bash", "Read", "Write", "Edit", "Glob", "Grep", "Agent"],
         disallowed_tools=["WebSearch", "WebFetch"],
+        agents=build_agent_definitions(),  # html-report-builder + pptx-deck-builder (parallel)
         permission_mode="bypassPermissions",
         model=settings.segmentation_model,
         fallback_model=settings.fallback_model,
