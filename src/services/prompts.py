@@ -75,7 +75,7 @@ PERSONAS_SCHEMA = """\
       "tagline": "one memorable line",
       "size_count": 312,
       "size_pct": 31.2,
-      "color": "#B8902A",
+      "color": "#00FF96",
       "demographics": ["bullet with number, e.g. '68% aged 18-24'", "..."],
       "behaviors": ["bullet with number vs overall population", "..."],
       "content": ["bullet with number", "..."],
@@ -94,19 +94,20 @@ CHART_STYLE = """\
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+# AIM dark editorial chart theme — charts sit on panel-colored cards in both deliverables.
 plt.rcParams.update({
-    "figure.facecolor": "#FFFFFF", "axes.facecolor": "#FFFFFF",
-    "axes.edgecolor": "#E6E1D5", "axes.linewidth": 1.0,
+    "figure.facecolor": "#121A4A", "axes.facecolor": "#121A4A",
+    "axes.edgecolor": "#1E285E", "axes.linewidth": 1.0,
     "axes.spines.top": False, "axes.spines.right": False,
-    "text.color": "#1A1C20", "axes.labelcolor": "#70747C",
-    "xtick.color": "#70747C", "ytick.color": "#70747C",
+    "text.color": "#E8ECF4", "axes.labelcolor": "#8A93B0",
+    "xtick.color": "#8A93B0", "ytick.color": "#8A93B0",
     "font.size": 11, "axes.titlesize": 13, "axes.titleweight": "bold",
-    "savefig.dpi": 200, "savefig.bbox": "tight", "savefig.facecolor": "#FFFFFF",
+    "savefig.dpi": 200, "savefig.bbox": "tight", "savefig.facecolor": "#121A4A",
 })
 # Rules: prefer horizontal bars; a persona's bars use ITS hex from personas.json;
-# overall-population comparison bars use #C9C4B8; value labels at bar ends in #1A1C20;
-# at most a light x-grid (#E6E1D5); short titles; figsize ~(7,4) overview, ~(5.5,3.5)
-# per-persona. Persona colors in order: #B8902A #2A7F7F #8E3B46 #2C4770 #4A7043 #6B4A7C.
+# overall-population comparison bars use #8A93B0; value labels at bar ends in #E8ECF4;
+# at most a light x-grid (#1E285E); short titles; figsize ~(7,4) overview, ~(5.5,3.5)
+# per-persona. Persona colors in order: #00FF96 #B37BFF #00D4F5 #FFD166 #FF6EC4 #2BA8FF.
 """
 
 

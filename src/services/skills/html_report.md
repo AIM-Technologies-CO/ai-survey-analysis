@@ -1,49 +1,64 @@
-# Skill: build `report.html` (self-contained client report)
+# Skill: build `report.html` (self-contained dark editorial report)
 
 You produce ONE file: `report.html` in the working directory, following the shared
-design system exactly.
+design system exactly (AIM dark editorial).
 
 ## Hard requirements
 
 - Fully self-contained: inline `<style>` only, every chart embedded as a base64
-  `data:image/png;base64,...` URI. ZERO external requests (no fonts, CDNs, scripts).
-  It must render perfectly offline and attached to an email.
-- Build it with a small Python script (e.g. `work/build_html.py`) that reads
-  `work/personas.json`, base64-encodes `work/charts/*.png`, and writes the final HTML —
-  don't hand-paste numbers.
+  `data:image/png;base64,...` URI. ZERO external requests (no webfonts, CDNs, scripts).
+  Renders perfectly offline / attached to an email.
+- Build with a Python script (e.g. `work/build_html.py`) that reads `work/personas.json`,
+  base64-encodes `work/charts/*.png`, and writes the HTML — never hand-paste numbers.
 
 ## Layout spec
 
-- `body`: ivory background, obsidian text, sans body font, `max-width: 1040px` centered
-  content column, base font 15px/1.6.
-- **Cover header**: white panel, 4px gold top rule; report title in serif 34px; under it
-  survey name · date · "AIM · Survey Intelligence" in muted small caps.
-- **Section titles**: serif 22px with a thin hairline underline and a short gold tick on
-  the left.
-- **Methodology**: the filter funnel as a 4-row table (label left, big serif number right);
-  approach paragraph; limitations in 12px muted italic.
-- **Audience overview**: roster of persona chips — each a white card with the persona-color
-  left border (4px), name in serif, tagline muted, and a horizontal % bar in the persona
-  color with the count/% as a large serif figure. Then the overview chart image full-width.
-- **Persona sections**: one white card per persona:
-  - Header band: persona-color 4px left border; name serif 24px in the persona color
-    (darken if needed for contrast), tagline muted; SIZE figure top-right (serif 28px).
-  - Two-column grid (single column under 720px): left = DEMOGRAPHICS + BEHAVIORS,
-    right = CONTENT PREFERENCES + AD RECEPTIVITY. Each block: small-caps muted label,
-    then tight bullets; every bullet keeps its number visible (wrap the % in
-    `<strong>` obsidian).
-  - Persona charts below the grid, side by side (max 2 per row), each with a muted caption.
-  - Placement callout: gold-soft background strip, gold-ink text:
-    "Reach them: {channel} · {format} · {angle}".
-- **Implications**: full-width table, hairline rules, header row in small caps muted,
-  first column = persona name in its color.
-- **Closing**: centered, serif, on ivory; small-print recap 11px muted.
-- Print-friendly: `@media print { ... }` keep colors (`-webkit-print-color-adjust: exact`),
-  avoid breaking cards across pages (`break-inside: avoid`).
+- `body`: canvas #0A0E27 background, text #E8ECF4, sans body
+  (`'Segoe UI', Calibri, Arial, sans-serif`), 15px/1.6; content column
+  `max-width: 1080px` centered; headings `Georgia, 'Times New Roman', serif`.
+- **Cover (hero)**: full-width band on canvas with a 6px accent-green bar fixed to the
+  LEFT edge; "AIM TECHNOLOGIES" 11px bold letter-spaced in accent; under it
+  "Survey Intelligence · Audience Segmentation" muted; then the two-line display title —
+  line 1 Georgia 52px #E8ECF4, line 2 Georgia italic 60px #00FF96; muted subtitle
+  (survey name · period · N); persona chip row (panel cards, persona dot + name +
+  `{pct}%`); meta strip: top hairline, 4 columns of label-over-value
+  (PREPARED BY / SURVEY / RESPONDENTS / PERIOD).
+- **Section chrome** (each numbered section): top hairline #1E285E; eyebrow
+  `0N · NAME` 10px bold letter-spaced #00FF96; floated-right running header
+  `AIM TECHNOLOGIES · SURVEY INTELLIGENCE · {date}` 9px #8A93B0; title Georgia 28px;
+  kicker italic 13px #8A93B0 — a real one-line takeaway.
+- **Methodology**: 4 KPI cards in a row (panel bg, rule border, accent top stripe 4px):
+  label 10px muted small-caps over a big Georgia 30px number (started / removed status /
+  removed exclude / final N — final N's number in accent green); approach paragraph dim;
+  limitations italic muted 12px.
+- **Audience overview**: one full-width 100% stacked size bar (height ~44px, segments in
+  persona colors, inline `{pct}%` labels in canvas-colored 12px bold, segment ≥ 6% only);
+  persona roster grid (2-3 columns): panel cards with persona-color TOP stripe (4px),
+  name Georgia italic 19px in persona color, tagline muted 12px, big `{pct}%` Georgia
+  26px text-color + `{count} respondents` muted; then the overview chart image on a
+  panel card.
+- **Persona sections**: one per persona, full chrome with eyebrow `0N · PERSONA`:
+  - Header row: persona-color dot (14px) + name Georgia italic 26px in persona color +
+    tagline muted; right-aligned SIZE block (`{pct}%` Georgia 30px text + count muted).
+  - Two-column grid (1fr 1fr; single column < 720px): four blocks (DEMOGRAPHICS /
+    BEHAVIORS / CONTENT PREFERENCES / AD RECEPTIVITY) — block label 10px small-caps in
+    the persona color, bullets 13.5px #E8ECF4 with numbers in `<strong>` accent or
+    persona color; thin rule between blocks.
+  - Charts on panel cards below (max 2 per row), captions 11px muted.
+  - Placement callout: panel-alt strip with persona-color left border 3px:
+    `Reach them: {channel} · {format} · {angle}` — 13px, channel/format/angle values bold.
+- **Implications**: full-width table on panel; header small-caps muted; persona names in
+  their colors; zebra rows panel/panel-alt; hairline rules only.
+- **Closing**: centered Georgia 20px with one italic accent-green phrase; recap 11px muted.
+- Footer of each section (or page footer): `AIM Technologies · Confidential` ·
+  `0N / Section` 10px muted, separated by a hairline.
+- Print: `@media print` with `-webkit-print-color-adjust: exact; print-color-adjust: exact;`
+  and `break-inside: avoid` on cards (the dark theme must survive printing).
+- Arabic content: wrap values in `dir="auto"`.
 
 ## QA before finishing
 
-1. `python -c` re-open the file: assert size > 50 KB and it contains every persona name.
-2. Confirm zero occurrences of `http://` or `https://` in the HTML (fonts/links aside —
-   there should be none at all).
-3. Confirm every `<img>` src starts with `data:image/png;base64,`.
+1. Re-open the file: assert size > 50 KB and every persona name present.
+2. Zero occurrences of `http://` / `https://` anywhere in the HTML.
+3. Every `<img>` src starts with `data:image/png;base64,`.
+4. Spot-check tokens: `#0A0E27`, `#121A4A`, `#00FF96` all appear in the CSS.
