@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Shared result · Survey Intelligence</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0D10'/%3E%3Ctext x='16' y='24' font-size='22' text-anchor='middle' fill='%23D4AF37' font-family='Georgia,serif'%3E%E2%88%BF%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/static/style.css" />
+<style>
+  /* ---- artifact viewer (reuses style.css tokens) ---- */
+  .crumb { color: var(--muted); font-size: 12.5px; letter-spacing: .14em; text-transform: uppercase; }
+  .art-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 2px 0 4px; }
+  .art-head h2 { margin: 0; font-family: var(--serif); font-size: 24px; font-weight: 600; }
+  .kind-badge {
+    font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--gold-ink); background: var(--gold-soft);
+    border: 1px solid var(--gold-line); border-radius: 999px; padding: 4px 12px;
+  }
+  .art-meta { color: var(--muted); font-size: 13px; }
+
+  .reveal { opacity: 0; transform: translateY(10px); animation: rise .5s cubic-bezier(.2,.7,.3,1) forwards; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+
+  .q-card { border: 1px solid var(--line); border-radius: 13px; padding: 16px 18px; background: var(--panel); }
+  .q-card + .q-card { margin-top: 12px; }
+  .q-top { display: flex; gap: 10px; align-items: baseline; }
+  .q-num { font-family: var(--serif); color: var(--gold-ink); font-size: 15px; min-width: 22px; }
+  .q-text { font-family: var(--serif); font-size: 16.5px; line-height: 1.45; flex: 1; }
+  .q-type { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+            color: var(--muted); border: 1px solid var(--line); border-radius: 999px;
+            padding: 3px 9px; white-space: nowrap; }
+  .q-opts { display: flex; flex-wrap: wrap; gap: 7px; margin: 11px 0 0 32px; }
+  .q-opt { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+           padding: 5px 10px; font-size: 12.5px; }
+  .q-why { margin: 11px 0 0 32px; color: var(--muted); font-size: 13px; line-height: 1.55;
+           border-left: 2px solid var(--gold-line); padding-left: 11px; }
+
+  .ans { margin: 10px 0 0 32px; }
+  .ans-val { display: inline-block; background: var(--gold-soft); border: 1px solid var(--gold-line);
+             color: var(--text); border-radius: 9px; padding: 6px 12px; font-size: 13.5px; font-weight: 600; }
+  .ans-why { margin-top: 9px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+  .refs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .ref { font-size: 11.5px; color: var(--gold-ink); background: var(--panel-2);
+         border: 1px dashed var(--gold-line); border-radius: 7px; padding: 3px 8px; }
+
+  .stat-band { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .stat { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 13px 15px; }
+  .stat .v { font-family: var(--serif); font-size: 21px; font-weight: 600; }
+  .stat .v.gold { color: var(--gold-ink); }
+  .stat .k { color: var(--muted); font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; margin-top: 3px; }
+
+  .err-note { color: var(--bad); font-size: 13px; margin-top: 8px; }
+
+  .job-bar { height: 10px; border-radius: 999px; background: var(--panel-2);
+             border: 1px solid var(--line); overflow: hidden; margin: 14px 0 8px; }
+  .job-fill { height: 100%; width: 0%; border-radius: 999px;
+              background: linear-gradient(90deg, var(--gold), var(--gold-2));
+              transition: width .6s cubic-bezier(.2,.7,.3,1); }
+  .job-line { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+  .job-line b { color: var(--text); }
+  .dl { display: inline-block; margin-top: 14px; background: linear-gradient(135deg, var(--gold), var(--gold-2));
+        color: var(--ink); font-weight: 700; border-radius: 10px; padding: 10px 18px;
+        text-decoration: none; font-size: 13.5px; box-shadow: 0 6px 18px rgba(212,175,55,.25); }
+  .dl:hover { filter: brightness(1.05); }
+
+  .empty { text-align: center; color: var(--muted); padding: 60px 0; font-size: 14px; }
+  .empty .glyph { font-family: var(--serif); font-size: 40px; color: var(--gold); display: block; margin-bottom: 10px; }
+  footer { max-width: 1080px; margin: 0 auto 40px; padding: 0 24px; color: var(--muted);
+           font-size: 12px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  footer a { color: var(--gold-ink); text-decoration: none; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo">∿</span>
+    <div>
+      <h1>Survey Intelligence</h1>
+      <p class="tagline">Shared result — generated via the Claude (MCP) connector</p>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="empty" id="loading"><span class="glyph">∿</span>Loading result…</div>
+</main>
+
+<footer>
+  <span id="foot-meta"></span>
+  <span><a href="/">Open Survey Intelligence</a> · <a href="/activity">Activity feed</a></span>
+</footer>
+
+<script>
+const KINDS = { suggest: "Suggested questions", ask: "Single-respondent answers",
+                preview: "Preview run", job: "Generation job", workspace: "Live workspace" };
+const esc = s => String(s ?? "").replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const usd = v => "$" + Number(v || 0).toFixed(v >= 1 ? 2 : 4);
+const main = document.getElementById("main");
+const rid = location.pathname.split("/").filter(Boolean).pop();
+
+function card(html, delay) {
+  return `<section class="card reveal" style="animation-delay:${delay * 90}ms">${html}</section>`;
+}
+function headBlock(rec) {
+  const name = rec.payload.survey_name || rec.survey_id || "";
+  const live = rec.kind === "workspace" ? " · this page updates live as the work continues" : "";
+  return card(`
+    <p class="crumb">Shared artifact</p>
+    <div class="art-head">
+      <h2>${esc(name)}</h2>
+      <span class="kind-badge">${esc(KINDS[rec.kind] || rec.kind)}</span>
+    </div>
+    <p class="art-meta">Updated ${esc(rec.updated_at || rec.created_at)} · via Claude${live}</p>`, 0);
+}
+function questionCard(q, i) {
+  const opts = (q.options || []).length
+    ? `<div class="q-opts">${q.options.map(o => `<span class="q-opt">${esc(o)}</span>`).join("")}</div>` : "";
+  const why = q.rationale ? `<p class="q-why">${esc(q.rationale)}</p>` : "";
+  return `<div class="q-card"><div class="q-top">
+      <span class="q-num">${String(i + 1).padStart(2, "0")}</span>
+      <span class="q-text">${esc(q.text)}</span>
+      <span class="q-type">${esc(q.type)}</span>
+    </div>${opts}${why}</div>`;
+}
+function answerBlock(a) {
+  const vals = Array.isArray(a.answer) ? a.answer : [a.answer];
+  const refs = (a.references || []).map(r =>
+    `<span class="ref">${esc(r.label)}: ${esc(r.answer)}</span>`).join("");
+  return `<div class="q-card"><div class="q-top">
+      <span class="q-num">→</span><span class="q-text">${esc(a.text)}</span>
+      <span class="q-type">${esc(a.type)}</span></div>
+    <div class="ans">${vals.map(v => `<span class="ans-val">${esc(v)}</span>`).join(" ")}
+      ${a.reason ? `<p class="ans-why">${esc(a.reason)}</p>` : ""}
+      ${refs ? `<div class="refs">${refs}</div>` : ""}</div></div>`;
+}
+
+function renderSuggest(rec) {
+  const qs = rec.payload.questions || [];
+  return headBlock(rec) + card(
+    `<h2>Proposed questions <span class="meta">${qs.length} · model ${esc(rec.payload.model || "")}</span></h2>` +
+    qs.map(questionCard).join(""), 1);
+}
+function renderAsk(rec) {
+  const p = rec.payload;
+  return headBlock(rec) + card(
+    `<h2>Generated answers <span class="meta">respondent ${esc(p.respondent_id || "")}</span></h2>` +
+    (p.answers || []).map(answerBlock).join(""), 1);
+}
+/* ---- preview: identical UI to the tool's Synthetic Data tab (app.js) ---- */
+const TYPE_LABELS = { multipleChoice: "Single answer", checkBoxes: "Multiple answers",
+                      shortAnswer: "Open ended", numericAnswer: "Numeric" };
+const typeLabel = t => TYPE_LABELS[t] || t || "";
+let pvSlides = [], pvIndex = 0;
+
+function buildRespondentCard(r, idx) {
+  const card = document.createElement("div");
+  card.className = "preview-resp";
+
+  const realCount = (r.real_answers || []).length;
+  const realGroups = [];
+  const secPos = {};
+  for (const a of (r.real_answers || [])) {
+    const sec = (a.section || "").trim() || "Other";
+    if (!(sec in secPos)) { secPos[sec] = realGroups.length; realGroups.push({ section: sec, rows: [] }); }
+    realGroups[secPos[sec]].rows.push(a);
+  }
+  const showSecHeads = realGroups.length > 1 || (realGroups[0] && realGroups[0].section !== "Other");
+  const realLines = realGroups.map(grp => {
+    const head = showSecHeads ? `<div class="pv-sec">${esc(grp.section)}</div>` : "";
+    const rows = grp.rows.map(a => {
+      const label = a.label || "";
+      const qtext = a.text || "";
+      const term = (label && qtext && label !== qtext)
+        ? `<dt><details class="pv-q"><summary dir="auto">${esc(label)}</summary><div class="pv-qfull" dir="auto">${esc(qtext)}</div></details></dt>`
+        : `<dt dir="auto">${esc(label || qtext)}</dt>`;
+      return `${term}<dd dir="auto">${esc(a.answer)}</dd>`;
+    }).join("");
+    return head + rows;
+  }).join("");
+
+  const genHtml = (r.generated || []).map(g => {
+    const refs = (g.references || []).map(rf =>
+      `<span class="chip-ref"><b>${esc(rf.label)}</b> → <bdi>${esc(rf.answer)}</bdi></span>`).join("");
+    return `<div class="pv-gen-item">
+      <div class="pv-gq">${esc(g.text)} <span class="qtype">(${esc(typeLabel(g.type))})</span></div>
+      <div>${(g.answer || []).map(v => `<span class="pill ai" dir="auto">${esc(v)}</span>`).join("") || "—"}</div>
+      ${g.reason ? `<div class="reason">"${esc(g.reason)}"</div>` : ""}
+      ${refs ? `<div class="refrow"><span class="grounded">grounded in</span>${refs}</div>` : ""}
+    </div>`;
+  }).join("") || (r.error ? `<div class="hint" style="color: var(--bad); margin:0">${esc(r.error)}</div>` : "");
+
+  const dateChip = r.submitDate ? `<span class="pv-date">${esc(String(r.submitDate).slice(0, 10))}</span>` : "";
+  card.innerHTML = `
+    <div class="pv-head">
+      <span class="pv-idx">${idx + 1}</span>
+      <span class="pv-title">Respondent ${idx + 1}</span>
+      <span class="pv-id">${esc(String(r.id).slice(-8))}</span>
+      ${dateChip}
+    </div>
+    <div class="pv-cols">
+      <div class="pv-col">
+        <details class="pv-real" open>
+          <summary>Real answers (${realCount})</summary>
+          ${realLines ? `<dl class="pv-grid">${realLines}</dl>` : `<div class="hint" style="margin:0">no recorded answers</div>`}
+        </details>
+      </div>
+      <div class="pv-col ai">
+        <label>AI-generated answers</label>
+        ${genHtml}
+      </div>
+    </div>`;
+  return card;
+}
+
+function pvShow(idx, dir) {
+  if (!pvSlides.length) return;
+  pvIndex = (idx + pvSlides.length) % pvSlides.length;
+  pvSlides.forEach((s, k) => s.classList.toggle("active", k === pvIndex));
+  const active = pvSlides[pvIndex];
+  if (active && dir) {
+    active.classList.remove("slide-l", "slide-r");
+    void active.offsetWidth;
+    active.classList.add(dir > 0 ? "slide-r" : "slide-l");
+  }
+  const counter = document.getElementById("pv-counter");
+  if (counter) counter.textContent = `Respondent ${pvIndex + 1} of ${pvSlides.length}`;
+  const jump = document.getElementById("pv-jump");
+  if (jump && jump.value !== String(pvIndex)) jump.value = String(pvIndex);
+}
+
+function attachSwipe(el) {
+  let x0 = null, y0 = null;
+  el.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+  el.addEventListener("touchend", (e) => {
+    if (x0 == null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    const dy = e.changedTouches[0].clientY - y0;
+    x0 = null;
+    if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy)) return;
+    pvShow(pvIndex + (dx < 0 ? 1 : -1), dx < 0 ? +1 : -1);
+  }, { passive: true });
+}
+
+function initPreviewCarousel(p) {
+  const c = p.cost || {};
+  let meta = `model: ${p.model} · showing ${p.sample} of ${(p.eligible || 0).toLocaleString()} eligible`;
+  if (c.scored) meta += ` · cost: ${usd(c.total_usd)} for ${c.scored} (≈ ${usd(c.per_respondent_usd)}/respondent)`;
+  const metaEl = document.getElementById("preview-meta");
+  if (metaEl) metaEl.textContent = meta;
+
+  const root = document.getElementById("preview-area");
+  root.innerHTML = "";
+  pvSlides = []; pvIndex = 0;
+  const results = p.results || [];
+  if (!results.length) {
+    root.innerHTML = `<div class="hint">No respondents in this preview.</div>`;
+    return;
+  }
+  const carousel = document.createElement("div");
+  carousel.className = "pv-carousel";
+  carousel.innerHTML = `
+    <div class="pv-nav">
+      <button class="pv-arrow pv-go" data-dir="-1" aria-label="Previous respondent">‹</button>
+      <select class="pv-jump" id="pv-jump" aria-label="Jump to respondent">
+        ${results.map((r, k) => `<option value="${k}">Respondent ${k + 1}</option>`).join("")}
+      </select>
+      <button class="pv-arrow pv-go" data-dir="1" aria-label="Next respondent">›</button>
+    </div>
+    <div class="pv-viewport"><div class="pv-track" id="pv-track"></div></div>
+    <div class="pv-foot">
+      <button class="pv-step pv-go" data-dir="-1" aria-label="Previous respondent">‹ Previous</button>
+      <span class="pv-counter" id="pv-counter">Respondent 1 of ${results.length}</span>
+      <button class="pv-step pv-go" data-dir="1" aria-label="Next respondent">Next ›</button>
+    </div>`;
+  root.appendChild(carousel);
+
+  const track = carousel.querySelector("#pv-track");
+  pvSlides = results.map((r, idx) => {
+    const slide = document.createElement("div");
+    slide.className = "pv-slide";
+    slide.appendChild(buildRespondentCard(r, idx));
+    track.appendChild(slide);
+    return slide;
+  });
+  carousel.querySelectorAll(".pv-go").forEach(b => {
+    b.onclick = () => { const d = parseInt(b.dataset.dir, 10); pvShow(pvIndex + d, d); };
+  });
+  document.getElementById("pv-jump").onchange = (e) => {
+    const t = parseInt(e.target.value);
+    pvShow(t, t >= pvIndex ? +1 : -1);
+  };
+  attachSwipe(carousel.querySelector(".pv-viewport"));
+  pvShow(0);
+}
+
+function previewCard(p, delay, stepNo) {
+  const c = p.cost || {};
+  const chip = stepNo ? `<span class="step">${stepNo}</span> ` : "";
+  const stats = `<div class="stat-band" style="margin-bottom:14px">
+    <div class="stat"><div class="v">${p.sample}</div><div class="k">sampled</div></div>
+    <div class="stat"><div class="v">${p.eligible}</div><div class="k">eligible</div></div>
+    <div class="stat"><div class="v">${usd((p.cost || {}).per_respondent_usd)}</div><div class="k">per respondent</div></div>
+    <div class="stat"><div class="v gold">${usd(c.projected_full_run_usd)}</div><div class="k">projected full run (cap ${p.cap})</div></div>
+  </div>`;
+  return card(`<h2>${chip}Preview on ${p.sample} <span class="meta" id="preview-meta"></span></h2>
+      ${stats}<div id="preview-area"></div>`, delay);
+}
+function jobCard(delay, stepNo) {
+  const chip = stepNo ? `<span class="step">${stepNo}</span> ` : "";
+  return card(`<h2>${chip}Generate for all respondents <span class="meta" id="job-state"></span></h2>
+      <div class="job-bar"><div class="job-fill" id="job-fill"></div></div>
+      <div class="job-line" id="job-line">Connecting…</div>
+      <div id="job-dl"></div>`, delay);
+}
+function renderPreview(rec) {
+  return headBlock(rec) + previewCard(rec.payload, 1);
+}
+function renderJob(rec) {
+  const p = rec.payload;
+  const qs = (p.questions || []).map(questionCard).join("");
+  return headBlock(rec)
+    + (qs ? card(`<h2>Questions generated for every respondent</h2>${qs}`, 1) : "")
+    + jobCard(2);
+}
+
+/* ---- workspace: ONE living page per survey, sections mirror the website's steps ---- */
+function cqRow(q) {
+  const needsOptions = q.type === "multipleChoice" || q.type === "checkBoxes";
+  const src = q.source === "manual"
+    ? `<span class="src manual">✍ manual</span>` : `<span class="src ai">✨ AI</span>`;
+  return `<div class="cq-row on">
+    <div class="cq-head">
+      <label class="inc"><input type="checkbox" checked disabled /> include</label>
+      ${src}
+      <select class="cq-type" disabled><option selected>${esc(typeLabel(q.type))}</option></select>
+    </div>
+    <textarea class="cq-text" readonly rows="2">${esc(q.text)}</textarea>
+    ${needsOptions ? `<div class="cq-options-wrap">
+      <label>Options (one per line):</label>
+      <textarea class="cq-options" readonly rows="${Math.max(2, (q.options || []).length)}">${esc((q.options || []).join("\n"))}</textarea>
+    </div>` : ""}
+    ${q.rationale ? `<div class="cq-rationale">✨ ${esc(q.rationale)}</div>` : ""}
+  </div>`;
+}
+function renderWorkspace(rec) {
+  const p = rec.payload;
+  let html = headBlock(rec), delay = 1, step = 1;
+  const qs = (p.questions || {}).questions || [];
+  if (qs.length) {
+    html += card(`<h2><span class="step">${step++}</span> Questions
+        <span class="meta">${qs.length} drafted</span></h2>` + qs.map(cqRow).join(""), delay++);
+  }
+  if (p.ask) {
+    html += card(`<h2><span class="step">${step++}</span> Single-respondent test
+        <span class="meta">respondent ${esc(p.ask.respondent_id || "")}</span></h2>`
+      + (p.ask.answers || []).map(answerBlock).join(""), delay++);
+  }
+  if (p.preview) html += previewCard(p.preview, delay++, step++);
+  if (p.job && p.job.job_id) html += jobCard(delay++, step++);
+  if (step === 1) html += card(`<div class="empty" style="padding:30px 0">
+      <span class="glyph">∿</span>Nothing here yet — ask Claude to suggest questions for this survey.</div>`, 1);
+  return html;
+}
+
+let pollGen = 0;  // invalidates stale pollJob timers after a re-render
+async function pollJob(jobId, gen) {
+  if (gen !== pollGen) return;
+  const fill = document.getElementById("job-fill"), line = document.getElementById("job-line");
+  const state = document.getElementById("job-state"), dl = document.getElementById("job-dl");
+  if (!fill) return;
+  try {
+    const r = await fetch(`/api/jobs/${encodeURIComponent(jobId)}`);
+    if (gen !== pollGen) return;
+    if (!r.ok) { line.innerHTML = "This job is no longer in memory (the server restarted). " +
+      "The Excel may still exist — ask in the chat that created it."; return; }
+    const j = await r.json();
+    state.textContent = j.state;
+    fill.style.width = (j.total ? Math.round(100 * j.done / j.total) : 0) + "%";
+    line.innerHTML = `<span><b>${j.done}</b>/${j.total} respondents</span>
+      <span><b>${j.ok}</b> ok</span><span><b>${j.failed}</b> failed</span>
+      ${j.capped ? `<span>capped from ${j.eligible} eligible</span>` : ""}
+      ${j.error ? `<span class="err-note">${esc(j.error)}</span>` : ""}`;
+    if (j.state === "done" && j.filename) {
+      dl.innerHTML = `<a class="dl" href="/api/jobs/${encodeURIComponent(jobId)}/download">⬇ Download ${esc(j.filename)}</a>`;
+    } else if (j.state !== "error") { setTimeout(() => pollJob(jobId, gen), 3000); }
+  } catch { setTimeout(() => pollJob(jobId, gen), 5000); }
+}
+
+function hydrate(rec) {
+  pollGen++;
+  const gen = pollGen;
+  const render = { suggest: renderSuggest, ask: renderAsk, preview: renderPreview,
+                   job: renderJob, workspace: renderWorkspace }[rec.kind];
+  main.innerHTML = render ? render(rec)
+    : headBlock(rec) + card(`<pre>${esc(JSON.stringify(rec.payload, null, 2))}</pre>`, 1);
+  document.getElementById("foot-meta").textContent =
+    `result ${rec.id} · ${rec.updated_at || rec.created_at}`;
+  const pv = rec.kind === "preview" ? rec.payload
+           : rec.kind === "workspace" ? rec.payload.preview : null;
+  if (pv) initPreviewCarousel(pv);
+  const jobId = rec.kind === "job" ? rec.payload.job_id
+              : rec.kind === "workspace" ? (rec.payload.job || {}).job_id : null;
+  if (jobId) pollJob(jobId, gen);
+}
+
+(async () => {
+  let rec;
+  try {
+    const r = await fetch(`/api/results/${encodeURIComponent(rid)}`);
+    if (!r.ok) throw 0;
+    rec = await r.json();
+  } catch {
+    main.innerHTML = `<div class="empty"><span class="glyph">∿</span>This link doesn’t point to a shared result (or it was removed).</div>`;
+    return;
+  }
+  hydrate(rec);
+
+  if (rec.kind === "workspace") {           // living page: pick up new sections as Claude works
+    let lastUpdated = rec.updated_at || rec.created_at;
+    setInterval(async () => {
+      try {
+        const r = await fetch(`/api/results/${encodeURIComponent(rid)}`);
+        if (!r.ok) return;
+        const next = await r.json();
+        if ((next.updated_at || next.created_at) === lastUpdated) return;
+        lastUpdated = next.updated_at || next.created_at;
+        const keep = pvIndex;
+        hydrate(next);
+        if (pvSlides.length) pvShow(Math.min(keep, pvSlides.length - 1));
+      } catch {}
+    }, 8000);
+  }
+})();
+</script>
+</body>
+</html>

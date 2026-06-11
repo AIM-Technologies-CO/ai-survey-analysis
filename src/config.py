@@ -52,6 +52,12 @@ class Settings:
     port: int = field(default_factory=lambda: _get_int("PORT_NUMBER", 8766))
     dev_mode: bool = field(default_factory=lambda: _get_bool("DEV_MODE", True))
 
+    # MCP endpoint (/mcp/) — empty token == no auth (localhost dev only)
+    mcp_auth_token: str = field(default_factory=lambda: os.getenv("MCP_AUTH_TOKEN", ""))
+    # Public origin used to build absolute download URLs in MCP results,
+    # e.g. https://surveys.example.com — falls back to http://localhost:{port}
+    public_base_url: str = field(default_factory=lambda: os.getenv("PUBLIC_BASE_URL", ""))
+
     # Segmentation agent (Agent SDK)
     segmentation_model: str = field(default_factory=lambda: os.getenv("SEGMENTATION_MODEL", "claude-opus-4-8"))
     fallback_model: str = field(default_factory=lambda: os.getenv("FALLBACK_MODEL", "claude-opus-4-7"))
@@ -68,9 +74,10 @@ class Settings:
     runs_dir: Path = field(default_factory=lambda: (PROJECT_ROOT / os.getenv("RUNS_DIR", "runs")).resolve())
     uploads_dir: Path = field(default_factory=lambda: (PROJECT_ROOT / os.getenv("UPLOADS_DIR", "uploads")).resolve())
     logs_dir: Path = field(default_factory=lambda: (PROJECT_ROOT / "logs").resolve())
+    shared_dir: Path = field(default_factory=lambda: (PROJECT_ROOT / os.getenv("SHARED_DIR", "shared")).resolve())
 
     def ensure_dirs(self) -> None:
-        for d in (self.runs_dir, self.uploads_dir, self.logs_dir):
+        for d in (self.runs_dir, self.uploads_dir, self.logs_dir, self.shared_dir):
             d.mkdir(parents=True, exist_ok=True)
 
 

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Activity · Survey Intelligence</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0D10'/%3E%3Ctext x='16' y='24' font-size='22' text-anchor='middle' fill='%23D4AF37' font-family='Georgia,serif'%3E%E2%88%BF%3C/text%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/static/style.css" />
+<style>
+  .feed-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .feed-head h2 { margin: 0; }
+  .toggle { margin-left: auto; display: flex; gap: 0; border: 1px solid var(--line);
+            border-radius: 999px; overflow: hidden; }
+  .toggle button { border: 0; border-radius: 0; background: var(--panel); cursor: pointer;
+                   padding: 7px 16px; font-size: 12.5px; }
+  .toggle button.on { background: var(--gold-soft); color: var(--gold-ink); font-weight: 700; }
+
+  .ev { display: grid; grid-template-columns: 150px 1fr; gap: 4px 18px;
+        padding: 13px 4px; border-bottom: 1px solid var(--line); }
+  .ev:last-child { border-bottom: 0; }
+  .ev-ts { color: var(--muted); font-size: 12px; padding-top: 3px; }
+  .ev-top { display: flex; gap: 9px; align-items: baseline; flex-wrap: wrap; }
+  .ev-action { font-family: var(--serif); font-size: 15px; font-weight: 600; }
+  .ev-who { font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+            border-radius: 999px; padding: 3px 9px; }
+  .ev-who.mcp { color: var(--gold-ink); background: var(--gold-soft); border: 1px solid var(--gold-line); }
+  .ev-who.web { color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); }
+  .ev-sum { color: var(--muted); font-size: 13px; line-height: 1.55; }
+  .ev-sum b { color: var(--text); font-weight: 600; }
+  .empty { text-align: center; color: var(--muted); padding: 60px 0; }
+  .empty .glyph { font-family: var(--serif); font-size: 40px; color: var(--gold); display: block; margin-bottom: 10px; }
+  footer { max-width: 1080px; margin: 0 auto 40px; padding: 0 24px; color: var(--muted); font-size: 12px; }
+  footer a { color: var(--gold-ink); text-decoration: none; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo">∿</span>
+    <div>
+      <h1>Survey Intelligence</h1>
+      <p class="tagline">Activity — every synthetic-data action, from the web UI and from Claude</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <div class="feed-head">
+      <h2>Latest actions</h2>
+      <div class="toggle">
+        <button id="f-all" class="on">All</button>
+        <button id="f-mcp">Claude (MCP)</button>
+      </div>
+    </div>
+    <div id="feed"><div class="empty"><span class="glyph">∿</span>Loading…</div></div>
+  </section>
+</main>
+
+<footer><a href="/">Open Survey Intelligence</a> — feed refreshes every 15s</footer>
+
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const usd = v => "$" + Number(v || 0).toFixed(v >= 1 ? 2 : 4);
+let mode = "all";
+
+const ACTIONS = {
+  filter_applied: "Checked eligible respondents",
+  preview_run: "Ran a preview",
+  generate_all_started: "Started a generation job",
+  generate_all_finished: "Generation job finished",
+};
+function summarize(ev) {
+  const p = ev.payload || {}, bits = [];
+  if (ev.survey_id) bits.push(`survey <b>${esc(ev.survey_id)}</b>`);
+  if (p.eligible != null) bits.push(`<b>${p.eligible}</b> eligible`);
+  if (p.sample != null) bits.push(`sample <b>${p.sample}</b>`);
+  if (p.cost_usd != null) bits.push(`cost <b>${usd(p.cost_usd)}</b>`);
+  if (p.total != null) bits.push(`<b>${p.total}</b> respondents`);
+  if (p.ok != null) bits.push(`<b>${p.ok}</b> ok / <b>${p.failed ?? 0}</b> failed`);
+  if (p.job_id) bits.push(`job <b>${esc(p.job_id)}</b>`);
+  if (p.file) bits.push(`file <b>${esc(p.file)}</b>`);
+  if (Array.isArray(p.questions) && p.questions.length)
+    bits.push(`questions: ${p.questions.map(q => `“${esc(q.text)}”`).join(", ")}`);
+  if (p.date_from || p.date_to)
+    bits.push(`dates ${esc(p.date_from || "…")} → ${esc(p.date_to || "…")}`);
+  return bits.join(" · ") || esc(JSON.stringify(p));
+}
+function row(ev) {
+  const mcp = ev.session_id === "mcp";
+  return `<div class="ev">
+    <div class="ev-ts">${esc((ev.ts || "").replace("T", " ").replace("Z", " UTC"))}</div>
+    <div>
+      <div class="ev-top">
+        <span class="ev-action">${esc(ACTIONS[ev.action] || ev.action)}</span>
+        <span class="ev-who ${mcp ? "mcp" : "web"}">${mcp ? "Claude" : "Web UI"}</span>
+      </div>
+      <div class="ev-sum">${summarize(ev)}</div>
+    </div></div>`;
+}
+async function load() {
+  const qs = mode === "mcp" ? "?session_id=mcp&limit=150" : "?limit=150";
+  try {
+    const r = await fetch("/api/activity" + qs);
+    const { events } = await r.json();
+    document.getElementById("feed").innerHTML = events.length
+      ? events.map(row).join("")
+      : `<div class="empty"><span class="glyph">∿</span>No activity yet.</div>`;
+  } catch {
+    document.getElementById("feed").innerHTML =
+      `<div class="empty"><span class="glyph">∿</span>Could not load the feed.</div>`;
+  }
+}
+function setMode(m) {
+  mode = m;
+  document.getElementById("f-all").classList.toggle("on", m === "all");
+  document.getElementById("f-mcp").classList.toggle("on", m === "mcp");
+  load();
+}
+document.getElementById("f-all").onclick = () => setMode("all");
+document.getElementById("f-mcp").onclick = () => setMode("mcp");
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>

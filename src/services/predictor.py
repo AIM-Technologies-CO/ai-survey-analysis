@@ -153,12 +153,14 @@ def _existing_questions_block(survey_id: str) -> tuple[str, str]:
     return "\n".join(lines), ""
 
 
-def suggest_questions(survey_id: str, n: int = 5, already: list[str] | None = None) -> dict:
+def suggest_questions(survey_id: str, n: int = 5, already: list[str] | None = None,
+                      focus: str | None = None) -> dict:
     """Ask Claude to propose `n` novel questions a survey owner might have missed.
 
     `already` holds question texts already in the builder (including ones suggested on
     earlier "Generate with AI" clicks). We feed them to Claude so it avoids re-proposing
     or lightly rewording them, and dedupe defensively against them afterwards.
+    `focus` optionally steers all suggestions toward a researcher-given theme.
     """
     from services.data import get_survey  # local import to avoid cycle at module load
     survey = get_survey(survey_id)
@@ -174,9 +176,15 @@ def suggest_questions(survey_id: str, n: int = 5, already: list[str] | None = No
 ALREADY DRAFTED (these are in the survey owner's builder right now, including questions you proposed on earlier clicks). Do NOT repeat or lightly reword ANY of these — propose genuinely different ones:
 {already_lines}"""
 
+    focus_block = ""
+    if focus and focus.strip():
+        focus_block = f"""
+
+The survey owner specifically wants questions about: {focus.strip()}. Every proposed question MUST address this focus (while still not duplicating anything existing or already drafted)."""
+
     prompt = f"""You are reviewing a real consumer-research survey called "{survey_name}". The full list of existing questions is below.
 
-Propose {n} NEW questions the survey owner might have forgotten to include — questions that would deepen the insight without duplicating anything already asked or already drafted. They should be relevant to the survey's theme (brand awareness, usage, attitudes, intent, demographics, etc.) but cover angles missing from the current set.
+Propose {n} NEW questions the survey owner might have forgotten to include — questions that would deepen the insight without duplicating anything already asked or already drafted. They should be relevant to the survey's theme (brand awareness, usage, attitudes, intent, demographics, etc.) but cover angles missing from the current set.{focus_block}
 
 EXISTING QUESTIONS:
 {existing_block}{already_block}

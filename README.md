@@ -74,6 +74,48 @@ docker compose up --build      # requires ANTHROPIC_API_KEY + SURVEY_MONGO_URL i
 | GET | `/api/segmentation/runs/{id}?since=` | seg | poll status + progress |
 | GET | `/api/segmentation/runs/{id}/report` `/pptx` | seg | the HTML report / PowerPoint |
 
+## MCP server (Synthetic Data tab → Claude)
+
+The synthetic-data feature is also exposed as an MCP server at **`/mcp/`** (streamable
+HTTP, trailing slash), mounted inside the same process so MCP-started jobs share the
+in-memory registry with the web UI. Tools: `list_surveys`, `get_survey_questions`,
+`count_eligible`, `suggest_questions`, `ask_one_respondent`,
+`preview_synthetic_answers` (returns `cost.projected_full_run_usd`), `generate_all`
+(capped; poll with `get_job_status`, which returns a `download_url` when done).
+Implementation: `src/mcp_app.py` + shared logic in `src/services/synth_service.py`.
+
+Env vars (see `.env.example`):
+
+- `MCP_AUTH_TOKEN` — shared secret; accepted as `Authorization: Bearer <t>` **or**
+  `?token=<t>` (claude.ai connectors can only carry the URL). Empty = open endpoint;
+  never deploy publicly without it.
+- `PUBLIC_BASE_URL` — public origin used in `download_url`, e.g.
+  `https://syntheticdata.ddns.net`.
+
+### Connect from Claude Code
+
+```bash
+claude mcp add --transport http synthetic-data https://syntheticdata.ddns.net/mcp/ \
+  --header "Authorization: Bearer $MCP_AUTH_TOKEN"
+# local dev: same command with http://localhost:8766/mcp/
+```
+
+### Connect from claude.ai (web)
+
+1. Deploy with `MCP_AUTH_TOKEN` and `PUBLIC_BASE_URL` set (public HTTPS is required —
+   already satisfied by https://syntheticdata.ddns.net).
+2. claude.ai → **Settings → Connectors → Add custom connector** → URL:
+   `https://syntheticdata.ddns.net/mcp/?token=<MCP_AUTH_TOKEN>`
+   (trailing slash matters; leave the OAuth fields empty).
+3. In a chat, enable the connector via the search-and-tools menu, then e.g.:
+   *“Find the Etisalat June survey, suggest 3 churn questions, preview them and tell
+   me the projected cost.”*
+
+Security note: the token only guards `/mcp/` — the web UI and `/api/*` (including job
+downloads) remain unauthenticated, as before. Verify with
+`uv run python scripts/mcp_smoke.py` (add `--llm` for one cheap model call;
+set `ANTHROPIC_MODEL=claude-haiku-4-5` first).
+
 ## Notes / limitations (prototype)
 
 - **In-memory state** (synth jobs + segmentation runs) → run gunicorn with `workers=1`;

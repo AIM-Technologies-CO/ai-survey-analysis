@@ -19,6 +19,8 @@ dependencies = [
     "numpy>=2.0",
     # synthetic-data feature (raw Anthropic API)
     "anthropic>=0.40",
+    # MCP endpoint at /mcp/ (already a transitive dep of claude-agent-sdk)
+    "mcp>=1.27",
     # segmentation feature (agent that writes & runs its own code)
     "claude-agent-sdk>=0.2.94",
     "python-pptx>=1.0.0",

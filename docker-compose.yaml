@@ -18,6 +18,8 @@ services:
       - "MAX_CONCURRENT_RUNS=${MAX_CONCURRENT_RUNS}"
       - "PORT_NUMBER=${PORT_NUMBER}"
       - "DEV_MODE=${DEV_MODE}"
+      - "MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}"
+      - "PUBLIC_BASE_URL=${PUBLIC_BASE_URL}"
     restart: always
     mem_limit: 4G
     mem_reservation: 1G
