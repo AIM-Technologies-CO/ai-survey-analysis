@@ -19,6 +19,11 @@ class RunRequest(BaseModel):
     include_all: bool = Field(default=True, description="Ignore the date range and use all submissions")
 
 
+class SuggestAxesRequest(BaseModel):
+    source: Literal["mongo", "upload"] = Field(description="Where the survey data comes from")
+    ref: str = Field(description="survey_id (mongo) or upload_id (upload)")
+
+
 class JobCreatedResponse(BaseModel):
     job_id: str
     status: str

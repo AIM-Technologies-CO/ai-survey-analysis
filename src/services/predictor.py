@@ -236,6 +236,63 @@ Return ONLY a JSON object, no prose:
     return {"model": MODEL, "questions": norm}
 
 
+def suggest_segmentation_axes(survey_name: str, labels: list[dict]) -> dict:
+    """Ask Claude which 3-6 question labels to build audience segments around.
+
+    `labels` is [{"label", "type"?, "question_text"?}]. Returns
+    {"model", "approach", "axes": [{"label", "reason"}]}. Only labels present in
+    the input survive (no invented columns), so the result maps to real data.
+    """
+    valid = {l["label"] for l in labels if l.get("label")}
+    catalog_lines = []
+    for l in labels:
+        lbl = l.get("label")
+        if not lbl:
+            continue
+        t = f" [{l['type']}]" if l.get("type") else ""
+        qt = f": {l['question_text']}" if l.get("question_text") else ""
+        catalog_lines.append(f"- {lbl}{t}{qt}")
+    catalog = "\n".join(catalog_lines)
+
+    prompt = f"""You are an audience-segmentation analyst planning how to segment a consumer-research survey called "{survey_name}".
+
+Pick the 3 to 6 question labels that would produce the most distinct, actionable audience personas. Favor demographics, behaviors, media/platform usage, and attitudes. Avoid identifiers, purely free-text columns, and near-duplicate labels.
+
+AVAILABLE LABELS (column [type]: question text):
+{catalog}
+
+Return ONLY a JSON object, no prose:
+{{
+  "approach": "1-2 plain sentences on the overall segmentation logic",
+  "axes": [
+    {{"label": "<EXACT label copied from the list>", "reason": "one short sentence why it matters"}}
+  ]
+}}
+
+Rules:
+- Every "label" MUST be copied EXACTLY from AVAILABLE LABELS. Do not invent labels.
+- Choose between 3 and 6 labels.
+- Do not use em dashes anywhere in your text; use commas or periods."""
+
+    msg = get_client().messages.create(
+        model=MODEL,
+        max_tokens=1200,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw = "".join(block.text for block in msg.content if getattr(block, "type", "") == "text")
+    parsed = _parse_json_block(raw)
+    axes_in = parsed.get("axes", []) if isinstance(parsed, dict) else []
+
+    axes, seen = [], set()
+    for a in axes_in:
+        lbl = (a.get("label") or "").strip()
+        if lbl in valid and lbl not in seen:
+            axes.append({"label": lbl, "reason": (a.get("reason") or "").strip()})
+            seen.add(lbl)
+    approach = (parsed.get("approach") or "").strip() if isinstance(parsed, dict) else ""
+    return {"model": MODEL, "approach": approach, "axes": axes}
+
+
 def ask_ad_hoc(survey_id: str, respondent: dict, custom_questions: list[dict]) -> dict:
     prompt = build_ad_hoc_prompt(survey_id, respondent, custom_questions)
 

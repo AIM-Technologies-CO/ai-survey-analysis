@@ -89,6 +89,29 @@
   color: var(--gold-ink);
 }
 
+/* ---------- AI plan preview ---------- */
+.seg-ai-plan { margin-top: 10px; }
+.seg-approach {
+  font-style: italic;
+  color: var(--text);
+  border-left: 3px solid var(--gold-ink);
+  padding: 4px 0 4px 12px;
+  margin-bottom: 10px;
+}
+.seg-axes-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.seg-axis {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--gold-ink);
+  border-radius: 9px;
+  padding: 8px 12px;
+}
+.seg-axis .ax-name { font-weight: 700; color: var(--text); font-size: 14px; }
+.seg-axis .ax-why { color: var(--muted); font-size: 12.5px; }
+
 /* ---------- label picker ---------- */
 .seg-lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; }
 .seg-labels {

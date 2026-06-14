@@ -156,8 +156,10 @@
         <button type="button" class="seg-mode" data-mode="manual">Choose questions (min 3)</button>
       </div>
 
-      <div id="seg-ai-note" class="hint" style="margin:8px 0 0;">
-        The AI analyst will pick the most informative segmentation axes from the data.
+      <div id="seg-ai-note" style="margin:10px 0 0;">
+        <p class="hint" style="margin:0;">The AI picks the segmentation axes. Preview its plan and review it before running:</p>
+        <button type="button" id="seg-suggest-btn" class="ghost" style="margin-top:8px;">✨ Preview the AI's plan</button>
+        <div id="seg-ai-plan" class="seg-ai-plan"></div>
       </div>
 
       <div id="seg-manual" class="hidden">

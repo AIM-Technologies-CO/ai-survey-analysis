@@ -3,7 +3,7 @@
 (function () {
   const MIN_Q = 3;
   const segState = {
-    source: "mongo", ref: null, selected: new Set(), mode: "ai",
+    source: "mongo", ref: null, selected: new Set(), mode: "ai", aiPlan: null,
     jobId: null, lastIdx: 0, timer: null, loaded: false, recountTimer: null,
   };
 
@@ -171,7 +171,11 @@
     const n = segState.selected.size;
     const hint = n > 0 && n < MIN_Q ? ` (pick at least ${MIN_Q})` : "";
     $("#seg-sel-count").textContent = `${n} selected${hint}`;
-    const ready = !!segState.ref && (segState.mode === "ai" || n >= MIN_Q);
+    const ready = !!segState.ref && (
+      segState.mode === "ai"
+        ? !!(segState.aiPlan && segState.aiPlan.length >= MIN_Q)  // must preview the plan first
+        : n >= MIN_Q
+    );
     $("#seg-run-btn").disabled = !ready;
   }
 
@@ -181,7 +185,13 @@
     updateSel();
   });
 
-  // ---- segment-by mode (AI vs choose up to 3) ----
+  // ---- segment-by mode (AI plan vs manual min-3) ----
+  function resetAiPlan() {
+    segState.aiPlan = null;
+    const out = $("#seg-ai-plan"); if (out) out.innerHTML = "";
+    const btn = $("#seg-suggest-btn"); if (btn) { btn.disabled = false; btn.textContent = "✨ Preview the AI's plan"; }
+  }
+
   document.querySelectorAll(".seg-mode").forEach((b) => {
     b.addEventListener("click", () => {
       document.querySelectorAll(".seg-mode").forEach((x) => x.classList.remove("active"));
@@ -190,9 +200,45 @@
       const manual = segState.mode === "manual";
       $("#seg-manual").classList.toggle("hidden", !manual);
       $("#seg-ai-note").classList.toggle("hidden", manual);
+      resetAiPlan();
       updateSel();
     });
   });
+
+  // ---- AI plan preview ("let the AI choose") ----
+  $("#seg-suggest-btn").addEventListener("click", suggestAxes);
+  async function suggestAxes() {
+    if (!segState.ref) return;
+    const btn = $("#seg-suggest-btn"), out = $("#seg-ai-plan");
+    btn.disabled = true; btn.textContent = "Thinking…";
+    out.innerHTML = `<div class="hint"><span class="spinner"></span>Asking the AI which axes to segment by…</div>`;
+    try {
+      const d = await api("/api/segmentation/suggest-axes", {
+        method: "POST", body: JSON.stringify({ source: segState.source, ref: segState.ref }),
+      });
+      const axes = d.axes || [];
+      segState.aiPlan = axes.map((a) => a.label);
+      const list = axes.map((a) =>
+        `<li class="seg-axis"><span class="ax-name">${escapeHtml(a.label)}</span>` +
+        (a.reason ? `<span class="ax-why">${escapeHtml(a.reason)}</span>` : "") + `</li>`).join("");
+      const enough = segState.aiPlan.length >= MIN_Q;
+      out.innerHTML =
+        (d.approach ? `<div class="seg-approach">${escapeHtml(d.approach)}</div>` : "") +
+        `<ul class="seg-axes-list">${list}</ul>` +
+        `<div class="hint" style="margin-top:6px;color:${enough ? "var(--muted)" : "var(--bad)"}">` +
+        (enough
+          ? `These ${axes.length} axes will seed the run. Click Run to proceed, or re-suggest.`
+          : `Only ${axes.length} usable axis(es) — need at least ${MIN_Q}. Try re-suggesting.`) +
+        `</div>`;
+    } catch (e) {
+      segState.aiPlan = null;
+      out.innerHTML = `<div class="hint" style="color:var(--bad)">Couldn't get a plan: ${escapeHtml(e.message)}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = segState.aiPlan && segState.aiPlan.length ? "↻ Re-suggest" : "✨ Preview the AI's plan";
+      updateSel();
+    }
+  }
 
   // ---- date range filter (database source only) ----
   function initDateFilter() {
@@ -241,6 +287,7 @@
   function showConfig() {
     $("#seg-config").classList.remove("hidden");
     if (segState.source !== "mongo") $("#seg-datefilter").classList.add("hidden");
+    resetAiPlan();  // a fresh survey/upload invalidates any previous AI plan
     updateSel();
     $("#seg-config").scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -250,6 +297,7 @@
   async function segRun() {
     if (!segState.ref) return;
     if (segState.mode === "manual" && segState.selected.size < MIN_Q) return;
+    if (segState.mode === "ai" && !(segState.aiPlan && segState.aiPlan.length >= MIN_Q)) return;
     const btn = $("#seg-run-btn");
     btn.disabled = true;
     btn.textContent = "Starting…";
@@ -265,7 +313,7 @@
       const includeAll = segState.source !== "mongo" || $("#seg-include-all").checked;
       const payload = {
         source: segState.source, ref: segState.ref,
-        segment_by: segState.mode === "ai" ? [] : [...segState.selected],
+        segment_by: segState.mode === "ai" ? (segState.aiPlan || []) : [...segState.selected],
         additional_details: $("#seg-details").value,
         include_all: includeAll,
       };

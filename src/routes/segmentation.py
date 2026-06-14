@@ -11,10 +11,10 @@ from fastapi.responses import FileResponse
 from pymongo.errors import PyMongoError
 
 from config import settings
-from models.job import JobCreatedResponse, JobStatusResponse, RunRequest
+from models.job import JobCreatedResponse, JobStatusResponse, RunRequest, SuggestAxesRequest
 from models.survey import CandidateLabel, SurveyCounts, SurveyDetail
 from models.upload import UploadResponse
-from services import data, excel_inspector, job_registry
+from services import data, excel_inspector, job_registry, predictor
 from utils.logging_config.logger import get_logger
 
 router = APIRouter(prefix="/api/segmentation", tags=["segmentation"])
@@ -108,6 +108,50 @@ async def upload_excel(file: UploadFile = File(...)):
         dest.unlink(missing_ok=True)
         raise HTTPException(500, "Failed to read the Excel file")
     result.upload_id = upload_id
+    return result
+
+
+# ---------- AI plan preview ("let the AI choose") --------------------------
+
+@router.post("/suggest-axes")
+async def suggest_axes(req: SuggestAxesRequest):
+    """Propose the 3-6 segmentation axes the AI would build personas around, so the
+    user can see (and run with) that plan before kicking off the full agent."""
+    if req.source == "upload":
+        path = excel_inspector.upload_path(req.ref)
+        if not path.exists():
+            raise HTTPException(404, f"Upload not found: {req.ref}")
+        cols = await run_in_threadpool(excel_inspector.column_names, path)
+        labels = [{"label": c} for c in cols]
+        survey_name = "Uploaded survey"
+    else:  # mongo
+        if not settings.mongo_url:
+            raise HTTPException(503, "SURVEY_MONGO_URL not configured")
+        try:
+            survey = await run_in_threadpool(data.get_survey, req.ref)
+            questions = await run_in_threadpool(data.get_survey_questions, req.ref)
+        except KeyError:
+            raise HTTPException(404, f"Survey not found: {req.ref}")
+        except PyMongoError as e:
+            raise HTTPException(503, "database unavailable") from e
+        survey_name = survey.get("name") or "Survey"
+        labels, seen = [], set()
+        for q in questions:
+            lbl = q.label or (q.text[:60] if q.text else None)
+            if not lbl or lbl in seen:
+                continue
+            seen.add(lbl)
+            labels.append({"label": lbl, "type": q.type, "question_text": q.text or None})
+
+    if not labels:
+        raise HTTPException(400, "No candidate question labels found for this survey")
+    try:
+        result = await run_in_threadpool(predictor.suggest_segmentation_axes, survey_name, labels)
+    except Exception as exc:
+        logger.exception("suggest-axes failed for %s", req.ref)
+        raise HTTPException(502, f"AI suggestion failed: {exc}")
+    if not result.get("axes"):
+        raise HTTPException(502, "The AI did not return any usable axes; try again")
     return result
 
 
