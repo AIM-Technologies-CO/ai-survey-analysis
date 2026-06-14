@@ -91,6 +91,9 @@
 
 /* ---------- AI plan preview ---------- */
 .seg-ai-plan { margin-top: 10px; }
+/* Global .hint has margin-top:-8px (tightens hints under headings); inside the plan
+   area that pulls the loading/error line up under the button. Neutralize it here. */
+.seg-ai-plan .hint { margin-top: 6px; margin-bottom: 0; }
 .seg-approach {
   font-style: italic;
   color: var(--text);
