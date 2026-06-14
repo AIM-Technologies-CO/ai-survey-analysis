@@ -37,16 +37,57 @@ SENTINEL = "SEGMENTATION_COMPLETE"
 _ERROR_SUBTYPES = {"error_max_turns", "error_during_execution", "error_max_budget_usd"}
 
 
+def _friendly_file(path: str) -> str:
+    """Describe a file the agent touches in plain language for the activity log."""
+    fname = Path(str(path)).name
+    if not fname:
+        return "a working file"
+    low = fname.lower()
+    if low == "personas.json":
+        return "the audience personas"
+    if low == "report.html":
+        return "the HTML report"
+    if low == "report.pptx":
+        return "the PowerPoint deck"
+    if low.endswith(".png"):
+        return f"a chart ({fname})"
+    if low.endswith(".py"):
+        return f"an analysis script ({fname})"
+    if low.endswith((".xlsx", ".xls", ".csv")):
+        return f"the survey data ({fname})"
+    if low.endswith((".md", ".json", ".txt")):
+        return f"a working file ({fname})"
+    return fname
+
+
 def _summarize_tool_input(name: str | None, ti: dict) -> str:
+    """Translate a raw agent tool call into a plain-English line a non-technical
+    reader can follow. The full, exact input is still kept in the audit trail."""
     if name == "Bash":
-        return f"Bash: {str(ti.get('command', ''))[:160]}"
-    if name in ("Write", "Edit", "Read"):
-        return f"{name}: {ti.get('file_path', '')}"
+        cmd = str(ti.get("command", "")).strip()
+        low = cmd.lower()
+        if any(k in low for k in ("pip install", "uv pip", "uv add", "pip3 install")):
+            return "Installing a Python library it needs"
+        if low.startswith(("python", "python3")) or " python " in low:
+            script = next((Path(t).name for t in cmd.split() if t.endswith(".py")), None)
+            return f"Running its analysis code ({script})" if script else "Running its analysis code"
+        return "Working in the analysis sandbox"
+    if name == "Write":
+        return f"Saving {_friendly_file(ti.get('file_path', ''))}"
+    if name == "Edit":
+        return f"Refining {_friendly_file(ti.get('file_path', ''))}"
+    if name == "Read":
+        return f"Reviewing {_friendly_file(ti.get('file_path', ''))}"
     if name in ("Glob", "Grep"):
-        return f"{name}: {ti.get('pattern', '')}"
+        return "Looking through the workspace files"
     if name in ("Agent", "Task"):
-        return f"Builder agent launched: {ti.get('subagent_type', '?')}"
-    return f"{name}: {str(ti)[:120]}"
+        sub = (ti.get("subagent_type") or "").lower()
+        if "html" in sub:
+            return "Handing off to the report designer to build the HTML report"
+        if "pptx" in sub or "deck" in sub:
+            return "Handing off to the deck designer to build the PowerPoint"
+        return "Handing work to a specialist builder"
+    return f"Working… ({name})" if name else "Working…"
 
 
 async def run_segmentation(

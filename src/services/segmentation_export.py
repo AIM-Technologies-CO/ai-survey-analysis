@@ -7,6 +7,7 @@ respondent; one column per question label (answers joined); metadata columns kep
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -44,10 +45,23 @@ def build_data_dictionary(survey_id: str) -> dict[str, str]:
     return out
 
 
-def export_survey_to_xlsx(survey_id: str, dest_path: str | Path) -> dict:
-    """Write usable respondents of a survey to a flat Excel at dest_path."""
+def export_survey_to_xlsx(
+    survey_id: str,
+    dest_path: str | Path,
+    *,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    include_all: bool = True,
+) -> dict:
+    """Write usable respondents of a survey to a flat Excel at dest_path.
+
+    When ``include_all`` is False, the cohort is narrowed to submitDate in
+    [date_from, date_to]. Defaults preserve the original behavior (all dates).
+    """
     db = data.get_db()
-    match = data._eligible_match(survey_id, include_all=True)
+    match = data._eligible_match(
+        survey_id, date_from=date_from, date_to=date_to, include_all=include_all
+    )
     projection = {"_id": 1, "status": 1, "submitDate": 1, "questions": 1}
 
     cap = settings.segmentation_row_cap

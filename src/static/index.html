@@ -134,14 +134,39 @@
     <section class="card hidden" id="seg-config">
       <h2><span class="step">2</span> Configure the run</h2>
       <div id="seg-counts" class="seg-counts"></div>
-      <p class="hint">Pick the question labels to build segments around. Filters are applied automatically:
-        <strong>status = submitted</strong>, exclude empty.</p>
-      <div class="row" style="margin:0 0 6px;">
-        <button type="button" id="seg-all" class="ghost">Select all</button>
-        <button type="button" id="seg-none" class="ghost">Clear</button>
-        <span class="meta" id="seg-sel-count"></span>
+
+      <div id="seg-datefilter" class="seg-datefilter hidden">
+        <div class="filter-group">
+          <label class="seg-lbl" for="seg-date-from">From</label>
+          <input id="seg-date-from" type="date" />
+        </div>
+        <div class="filter-group">
+          <label class="seg-lbl" for="seg-date-to">To</label>
+          <input id="seg-date-to" type="date" />
+        </div>
+        <label class="chk"><input type="checkbox" id="seg-include-all" /> include all dates</label>
+        <span class="meta" id="seg-eligible-meta"></span>
       </div>
-      <div id="seg-labels" class="seg-labels"></div>
+
+      <p class="hint">Choose how to build the segments. Filters are applied automatically:
+        <strong>status = submitted</strong>, exclude empty.</p>
+
+      <div class="seg-modes">
+        <button type="button" class="seg-mode active" data-mode="ai">✨ Let the AI choose</button>
+        <button type="button" class="seg-mode" data-mode="manual">Choose questions (min 3)</button>
+      </div>
+
+      <div id="seg-ai-note" class="hint" style="margin:8px 0 0;">
+        The AI analyst will pick the most informative segmentation axes from the data.
+      </div>
+
+      <div id="seg-manual" class="hidden">
+        <div class="row" style="margin:10px 0 6px;">
+          <button type="button" id="seg-none" class="ghost">Clear</button>
+          <span class="meta" id="seg-sel-count"></span>
+        </div>
+        <div id="seg-labels" class="seg-labels"></div>
+      </div>
       <div style="margin-top:16px;">
         <label class="seg-lbl" for="seg-details">Additional details (optional)</label>
         <textarea id="seg-details" style="width:100%;min-height:70px;margin-top:6px;"
@@ -156,6 +181,7 @@
     <section class="card hidden" id="seg-results">
       <h2><span class="step">3</span> Results</h2>
       <div id="seg-run-status"></div>
+      <button id="seg-cancel-btn" class="seg-cancel hidden" type="button">■ Cancel run</button>
       <div id="seg-log" class="seg-log hidden"></div>
       <div id="seg-actions" class="row hidden" style="margin-top:12px;">
         <a class="dl-btn" id="seg-dl-pptx">⬇ Download PowerPoint</a>

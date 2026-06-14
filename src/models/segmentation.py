@@ -17,6 +17,7 @@ class RunStatus(str, Enum):
     failed = "failed"
     timed_out = "timed_out"
     artifacts_missing = "artifacts_missing"
+    cancelled = "cancelled"
 
 
 # Statuses that mean the job is finished (no more events will come).
@@ -25,6 +26,7 @@ TERMINAL_STATUSES = {
     RunStatus.failed,
     RunStatus.timed_out,
     RunStatus.artifacts_missing,
+    RunStatus.cancelled,
 }
 
 

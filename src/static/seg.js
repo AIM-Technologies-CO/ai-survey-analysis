@@ -1,14 +1,34 @@
 // Segmentation tab: tab switching + survey picker / upload / run / poll / report.
 // Runs after app.js and reuses its globals: $, api, toast, escapeHtml.
 (function () {
+  const MIN_Q = 3;
   const segState = {
-    source: "mongo", ref: null, selected: new Set(),
-    jobId: null, lastIdx: 0, timer: null, loaded: false,
+    source: "mongo", ref: null, selected: new Set(), mode: "ai",
+    jobId: null, lastIdx: 0, timer: null, loaded: false, recountTimer: null,
   };
 
   function note(el, kind, html) {
     const c = kind === "error" ? "var(--bad)" : kind === "ok" ? "var(--good)" : "var(--muted)";
     el.innerHTML = `<div class="hint" style="margin:10px 0 0;color:${c}">${html}</div>`;
+  }
+
+  // Plain-language presentation of each event kind for the live activity log.
+  const KIND_META = {
+    status:         { icon: "•",  label: "" },
+    tool_use:       { icon: "⚙",  label: "" },
+    tool_result:    { icon: "↳",  label: "" },
+    assistant_text: { icon: "🧠", label: "Analyst" },
+    result:         { icon: "✓",  label: "" },
+    error:          { icon: "⚠",  label: "" },
+  };
+
+  function appendLog(log, ev) {
+    const meta = KIND_META[ev.kind] || { icon: "•", label: "" };
+    const div = document.createElement("div");
+    div.className = "l l-" + ev.kind;
+    const lbl = meta.label ? `<span class="lbl">${escapeHtml(meta.label)}</span> ` : "";
+    div.innerHTML = `<span class="ic">${meta.icon}</span> ${lbl}<span class="msg">${escapeHtml(ev.message)}</span>`;
+    log.appendChild(div);
   }
 
   // ---- top tab switching ----
@@ -83,10 +103,12 @@
     try {
       const d = await api(`/api/segmentation/surveys/${sv.id}`);
       segState.ref = d.id;
+      segState.dateBounds = d.date_bounds || null;
       $("#seg-source-status").innerHTML = "";
       renderCounts(d.counts);
       renderLabels(d.candidate_labels);
       showConfig();
+      initDateFilter();
     } catch (e) {
       note($("#seg-source-status"), "error", `Error: ${escapeHtml(e.message)}`);
     }
@@ -146,22 +168,79 @@
   }
 
   function updateSel() {
-    $("#seg-sel-count").textContent = `${segState.selected.size} selected`;
-    $("#seg-run-btn").disabled = !(segState.ref && segState.selected.size > 0);
+    const n = segState.selected.size;
+    const hint = n > 0 && n < MIN_Q ? ` (pick at least ${MIN_Q})` : "";
+    $("#seg-sel-count").textContent = `${n} selected${hint}`;
+    const ready = !!segState.ref && (segState.mode === "ai" || n >= MIN_Q);
+    $("#seg-run-btn").disabled = !ready;
   }
 
-  $("#seg-all").addEventListener("click", () => {
-    $("#seg-labels").querySelectorAll("input").forEach((cb) => { cb.checked = true; segState.selected.add(cb.value); });
-    updateSel();
-  });
   $("#seg-none").addEventListener("click", () => {
     $("#seg-labels").querySelectorAll("input").forEach((cb) => { cb.checked = false; });
     segState.selected.clear();
     updateSel();
   });
 
+  // ---- segment-by mode (AI vs choose up to 3) ----
+  document.querySelectorAll(".seg-mode").forEach((b) => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll(".seg-mode").forEach((x) => x.classList.remove("active"));
+      b.classList.add("active");
+      segState.mode = b.dataset.mode;
+      const manual = segState.mode === "manual";
+      $("#seg-manual").classList.toggle("hidden", !manual);
+      $("#seg-ai-note").classList.toggle("hidden", manual);
+      updateSel();
+    });
+  });
+
+  // ---- date range filter (database source only) ----
+  function initDateFilter() {
+    const wrap = $("#seg-datefilter");
+    if (segState.source !== "mongo") { wrap.classList.add("hidden"); return; }
+    wrap.classList.remove("hidden");
+    const b = segState.dateBounds || {};
+    const min = b.min ? b.min.slice(0, 10) : "";
+    const max = b.max ? b.max.slice(0, 10) : "";
+    const from = $("#seg-date-from"), to = $("#seg-date-to");
+    for (const el of [from, to]) { if (min) el.min = min; if (max) el.max = max; }
+    from.value = min; to.value = max;
+    $("#seg-include-all").checked = false;
+    recountEligible();
+  }
+
+  function recountEligible() {
+    if (segState.source !== "mongo" || !segState.ref) return;
+    clearTimeout(segState.recountTimer);
+    segState.recountTimer = setTimeout(async () => {
+      const includeAll = $("#seg-include-all").checked;
+      const meta = $("#seg-eligible-meta");
+      const p = new URLSearchParams({ include_all: includeAll });
+      if (!includeAll) {
+        if ($("#seg-date-from").value) p.set("date_from", $("#seg-date-from").value);
+        if ($("#seg-date-to").value) p.set("date_to", $("#seg-date-to").value);
+      }
+      meta.textContent = "counting…";
+      try {
+        const d = await api(`/api/segmentation/surveys/${segState.ref}/eligible?${p.toString()}`);
+        meta.textContent = `${d.eligible} respondents in range`;
+      } catch (e) {
+        meta.textContent = "";
+      }
+    }, 300);
+  }
+
+  ["seg-date-from", "seg-date-to"].forEach((id) => $("#" + id).addEventListener("change", recountEligible));
+  $("#seg-include-all").addEventListener("change", (e) => {
+    const on = e.target.checked;
+    $("#seg-date-from").disabled = on;
+    $("#seg-date-to").disabled = on;
+    recountEligible();
+  });
+
   function showConfig() {
     $("#seg-config").classList.remove("hidden");
+    if (segState.source !== "mongo") $("#seg-datefilter").classList.add("hidden");
     updateSel();
     $("#seg-config").scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -169,7 +248,8 @@
   // ---- run + poll ----
   $("#seg-run-btn").addEventListener("click", segRun);
   async function segRun() {
-    if (!segState.ref || segState.selected.size === 0) return;
+    if (!segState.ref) return;
+    if (segState.mode === "manual" && segState.selected.size < MIN_Q) return;
     const btn = $("#seg-run-btn");
     btn.disabled = true;
     btn.textContent = "Starting…";
@@ -182,17 +262,26 @@
     segState.lastIdx = 0;
     note($("#seg-run-status"), "info", "<span class=\"spinner\"></span>Submitting run…");
     try {
+      const includeAll = segState.source !== "mongo" || $("#seg-include-all").checked;
+      const payload = {
+        source: segState.source, ref: segState.ref,
+        segment_by: segState.mode === "ai" ? [] : [...segState.selected],
+        additional_details: $("#seg-details").value,
+        include_all: includeAll,
+      };
+      if (segState.source === "mongo" && !includeAll) {
+        payload.date_from = $("#seg-date-from").value || null;
+        payload.date_to = $("#seg-date-to").value || null;
+      }
       const res = await fetch("/api/segmentation/runs", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source: segState.source, ref: segState.ref,
-          segment_by: [...segState.selected], additional_details: $("#seg-details").value,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(await res.text());
       const d = await res.json();
       segState.jobId = d.job_id;
       note($("#seg-run-status"), "info", `<span class="spinner"></span>Analyst working… (job ${escapeHtml(d.job_id.slice(0, 8))})`);
+      showCancel(true);
       segState.timer = setInterval(segPoll, 1800);
       segPoll();
     } catch (e) {
@@ -202,23 +291,42 @@
     }
   }
 
-  const TERMINAL = { succeeded: 1, failed: 1, timed_out: 1, artifacts_missing: 1 };
+  // ---- cancel ----
+  function showCancel(on) {
+    const cb = $("#seg-cancel-btn");
+    cb.classList.toggle("hidden", !on);
+    if (on) { cb.disabled = false; cb.textContent = "■ Cancel run"; }
+  }
+
+  $("#seg-cancel-btn").addEventListener("click", segCancel);
+  async function segCancel() {
+    if (!segState.jobId) return;
+    const cb = $("#seg-cancel-btn");
+    cb.disabled = true;
+    cb.textContent = "Cancelling…";
+    try {
+      await api(`/api/segmentation/runs/${segState.jobId}/cancel`, { method: "POST" });
+      note($("#seg-run-status"), "info", "<span class=\"spinner\"></span>Cancelling — stopping the analyst…");
+    } catch (e) {
+      toast(`Couldn't cancel: ${e.message}`);
+      cb.disabled = false;
+      cb.textContent = "■ Cancel run";
+    }
+  }
+
+  const TERMINAL = { succeeded: 1, failed: 1, timed_out: 1, artifacts_missing: 1, cancelled: 1 };
   async function segPoll() {
     if (!segState.jobId) return;
     try {
       const d = await api(`/api/segmentation/runs/${segState.jobId}?since=${segState.lastIdx}`);
       const log = $("#seg-log");
-      for (const ev of d.events) {
-        const div = document.createElement("div");
-        div.className = "l l-" + ev.kind;
-        div.textContent = `[${ev.kind}] ${ev.message}`;
-        log.appendChild(div);
-      }
+      for (const ev of d.events) appendLog(log, ev);
       segState.lastIdx += d.events.length;
       log.scrollTop = log.scrollHeight;
       if (TERMINAL[d.status]) {
         clearInterval(segState.timer);
         segState.timer = null;
+        showCancel(false);
         const btn = $("#seg-run-btn");
         btn.disabled = false;
         btn.textContent = "Run Segmentation →";
@@ -233,6 +341,8 @@
           if (d.pptx_url) { $("#seg-dl-pptx").href = d.pptx_url; $("#seg-dl-pptx").style.display = ""; }
           else { $("#seg-dl-pptx").style.display = "none"; }
           $("#seg-actions").classList.remove("hidden");
+        } else if (d.status === "cancelled") {
+          note($("#seg-run-status"), "info", `Run cancelled${cost}`);
         } else {
           note($("#seg-run-status"), "error", `Run ${escapeHtml(d.status)}: ${escapeHtml(d.error || "see log above")}${cost}`);
         }
@@ -240,6 +350,7 @@
     } catch (e) {
       clearInterval(segState.timer);
       segState.timer = null;
+      showCancel(false);
       note($("#seg-run-status"), "error", `Polling error: ${escapeHtml(e.message)}`);
       $("#seg-run-btn").disabled = false;
       $("#seg-run-btn").textContent = "Run Segmentation →";

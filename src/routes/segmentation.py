@@ -33,6 +33,7 @@ def survey_detail(survey_id: str):
         meta = data.respondents_meta(survey_id)
         usable = data.count_eligible(survey_id, include_all=True)
         questions = data.get_survey_questions(survey_id)
+        bounds = data.submit_date_bounds(survey_id)
     except KeyError:
         raise HTTPException(404, "survey not found")
     except PyMongoError as e:
@@ -56,7 +57,28 @@ def survey_detail(survey_id: str):
             usable=usable,
         ),
         candidate_labels=labels,
+        date_bounds=bounds,
     )
+
+
+@router.get("/surveys/{survey_id}/eligible")
+def survey_eligible(
+    survey_id: str,
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
+    include_all: bool = Query(False),
+):
+    """Live count of usable respondents for a date range (drives the picker)."""
+    try:
+        df = data.parse_submit_date(date_from)
+        dt = data.parse_submit_date(date_to)
+    except ValueError:
+        raise HTTPException(400, "Invalid date; use YYYY-MM-DD")
+    try:
+        n = data.count_eligible(survey_id, date_from=df, date_to=dt, include_all=include_all)
+    except PyMongoError as e:
+        raise HTTPException(503, "database unavailable") from e
+    return {"eligible": n}
 
 
 # ---------- upload an Excel ------------------------------------------------
@@ -93,9 +115,13 @@ async def upload_excel(file: UploadFile = File(...)):
 
 @router.post("/runs", response_model=JobCreatedResponse)
 async def start_run(req: RunRequest):
-    if not req.segment_by:
-        raise HTTPException(400, "Select at least one question label to segment by")
+    # segment_by: empty = let the AI choose the axes; otherwise at least 3 labels.
+    if req.segment_by and len(req.segment_by) < 3:
+        raise HTTPException(400, "Choose at least 3 question labels, or let the AI choose the segments.")
 
+    # Date range applies to the database source only (uploads have no guaranteed date column).
+    date_from = date_to = None
+    include_all = True
     if req.source == "upload":
         path = excel_inspector.upload_path(req.ref)
         if not path.exists():
@@ -113,8 +139,17 @@ async def start_run(req: RunRequest):
             raise HTTPException(404, f"Survey not found: {req.ref}")
         except PyMongoError as e:
             raise HTTPException(503, "database unavailable") from e
+        try:
+            date_from = data.parse_submit_date(req.date_from)
+            date_to = data.parse_submit_date(req.date_to)
+        except ValueError:
+            raise HTTPException(400, "Invalid date; use YYYY-MM-DD")
+        include_all = req.include_all or (date_from is None and date_to is None)
 
-    state = job_registry.create_job(req.source, req.ref, req.segment_by, req.additional_details)
+    state = job_registry.create_job(
+        req.source, req.ref, req.segment_by, req.additional_details,
+        date_from=date_from, date_to=date_to, include_all=include_all,
+    )
     job_registry.launch(state.job_id)
     logger.info("Started segmentation run %s (source=%s ref=%s)", state.job_id, req.source, req.ref)
     return JobCreatedResponse(
@@ -123,11 +158,7 @@ async def start_run(req: RunRequest):
     )
 
 
-@router.get("/runs/{job_id}", response_model=JobStatusResponse)
-def run_status(job_id: str, since: int = Query(0, ge=0)):
-    state = job_registry.get_job(job_id)
-    if not state:
-        raise HTTPException(404, "job not found")
+def _status_response(job_id: str, state, since: int = 0) -> JobStatusResponse:
     report_url = f"/api/segmentation/runs/{job_id}/report" if (state.report_path and state.report_path.exists()) else None
     pptx_url = f"/api/segmentation/runs/{job_id}/pptx" if (state.pptx_path and state.pptx_path.exists()) else None
     return JobStatusResponse(
@@ -142,6 +173,26 @@ def run_status(job_id: str, since: int = Query(0, ge=0)):
         created_at=state.created_at,
         updated_at=state.updated_at,
     )
+
+
+@router.get("/runs/{job_id}", response_model=JobStatusResponse)
+def run_status(job_id: str, since: int = Query(0, ge=0)):
+    state = job_registry.get_job(job_id)
+    if not state:
+        raise HTTPException(404, "job not found")
+    return _status_response(job_id, state, since)
+
+
+@router.post("/runs/{job_id}/cancel", response_model=JobStatusResponse)
+async def cancel_run(job_id: str):
+    """Stop a queued/running segmentation job. Idempotent-ish: 409 if already finished."""
+    state = job_registry.get_job(job_id)
+    if not state:
+        raise HTTPException(404, "job not found")
+    if not job_registry.cancel_job(job_id):
+        raise HTTPException(409, f"Run already {state.status}; nothing to cancel")
+    logger.info("Cancellation requested for segmentation run %s", job_id)
+    return _status_response(job_id, state)
 
 
 @router.get("/runs/{job_id}/report")

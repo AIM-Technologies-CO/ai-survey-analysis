@@ -50,6 +50,11 @@ HOW YOU WORK
 - Multi-select answers may appear as one cell joined by "; " — split on that separator.
 - Be rigorous and finish the entire task autonomously; state assumptions in
   personas.json's methodology fields rather than asking questions.
+
+WRITING STYLE (applies to every word that reaches the client)
+- Do NOT use em dashes (—) or en dashes (–) anywhere in the copy you author: taglines,
+  bullets, methodology prose, titles, and implications. Use commas, periods, colons, or
+  parentheses instead. Hyphens in ranges ("18-24") and compound words are fine.
 """
 
 
@@ -58,7 +63,7 @@ HOW YOU WORK
 # --------------------------------------------------------------------------- #
 PERSONAS_SCHEMA = """\
 {
-  "report_title": "Audience Segmentation — <short campaign-relevant title>",
+  "report_title": "Audience Segmentation: <short campaign-relevant title>",
   "survey_name": "<survey name>",
   "date": "<YYYY-MM-DD>",
   "methodology": {

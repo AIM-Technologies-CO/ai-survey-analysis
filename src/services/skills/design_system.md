@@ -98,3 +98,6 @@ always canvas (#0A0E27) for contrast. Never reassign colors between formats.
 - Dark theme everywhere — no white flashes; charts sit on panel-colored cards so they blend.
 - Generous whitespace, strict alignment grid, bullets ≤ 14 words.
 - It must read like AIM's flagship client deck: premium, editorial, confident.
+- Copy punctuation: never use em dashes (—) or en dashes (–) in rendered text; use commas,
+  periods, colons, or parentheses instead. Hyphens in ranges like 18-24 are fine. If a
+  string in personas.json contains one, rewrite it without the dash when you render it.

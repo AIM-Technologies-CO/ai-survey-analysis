@@ -12,8 +12,11 @@ from models.segmentation import ProgressEvent
 class RunRequest(BaseModel):
     source: Literal["mongo", "upload"] = Field(description="Where the survey data comes from")
     ref: str = Field(description="survey_id (mongo) or upload_id (upload)")
-    segment_by: list[str] = Field(default_factory=list, description="Question labels to segment by")
+    segment_by: list[str] = Field(default_factory=list, description="Question labels to segment by (empty = let the AI choose; max 3)")
     additional_details: str = Field(default="", description="Free-text guidance for the agent")
+    date_from: str | None = Field(default=None, description="Lower submitDate bound 'YYYY-MM-DD' (mongo source only)")
+    date_to: str | None = Field(default=None, description="Upper submitDate bound 'YYYY-MM-DD' (mongo source only)")
+    include_all: bool = Field(default=True, description="Ignore the date range and use all submissions")
 
 
 class JobCreatedResponse(BaseModel):

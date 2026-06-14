@@ -33,3 +33,6 @@ class SurveyDetail(BaseModel):
     name: str
     counts: SurveyCounts
     candidate_labels: list[CandidateLabel] = Field(default_factory=list)
+    date_bounds: dict[str, str | None] | None = Field(
+        default=None, description="Min/max submitDate over the eligible cohort, for the date picker"
+    )

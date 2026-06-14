@@ -56,6 +56,39 @@
 }
 .seg-chip b { color: var(--gold-ink); font-size: 16px; font-family: var(--serif); margin-right: 4px; }
 
+/* ---------- date range filter (DB source) ---------- */
+.seg-datefilter {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.seg-datefilter .filter-group { display: flex; flex-direction: column; gap: 4px; }
+.seg-datefilter input[type="date"] { min-width: 150px; }
+.seg-datefilter input:disabled { opacity: 0.5; }
+
+/* ---------- segment-by mode toggle ---------- */
+.seg-modes { display: flex; gap: 8px; margin: 10px 0 0; flex-wrap: wrap; }
+.seg-mode {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.seg-mode.active {
+  border-color: var(--gold-ink);
+  background: linear-gradient(180deg, var(--gold-soft), transparent);
+  color: var(--gold-ink);
+}
+
 /* ---------- label picker ---------- */
 .seg-lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; }
 .seg-labels {
@@ -90,12 +123,42 @@
   max-height: 320px;
   overflow-y: auto;
 }
-.seg-log .l { white-space: pre-wrap; word-break: break-word; }
+.seg-log .l {
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 0;
+}
+.seg-log .l .ic { flex: none; width: 1.1em; text-align: center; opacity: 0.85; }
+.seg-log .l .lbl {
+  flex: none;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.7;
+}
+.seg-log .l .msg { flex: 1; min-width: 0; }
 .seg-log .l-tool_use { color: #E9C46A; }
 .seg-log .l-assistant_text { color: #EDE3CB; }
 .seg-log .l-status { color: #9FD9A0; }
 .seg-log .l-error { color: #E59A92; }
 .seg-log .l-result { color: #F2C94C; font-weight: 700; }
+
+/* ---------- cancel run button ---------- */
+.seg-cancel {
+  margin-top: 10px;
+  background: transparent;
+  border: 1px solid var(--bad, #C0524A);
+  color: var(--bad, #C0524A);
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.seg-cancel:hover:not(:disabled) { background: rgba(192, 82, 74, 0.10); }
+.seg-cancel:disabled { opacity: 0.55; cursor: default; }
 
 /* ---------- report iframe ---------- */
 .seg-report {
