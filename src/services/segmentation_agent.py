@@ -24,7 +24,7 @@ from claude_agent_sdk import (
 
 from config import settings
 from models.segmentation import ProgressEvent, RunStatus, SegmentationResult
-from services import run_workspace
+from services import run_workspace, segmentation_sanitize
 from services.prompts import SYSTEM_APPEND, build_agent_definitions, build_task_prompt
 from utils.audit import AuditTrail
 from utils.logging_config.logger import get_logger
@@ -257,6 +257,18 @@ async def run_segmentation(
         html_ok, pptx_ok = _artifacts_ok()
 
     if html_ok and pptx_ok:
+        # Safety net: strip any em/en dashes the model slipped past the prompt rule.
+        try:
+            counts = await asyncio.to_thread(
+                segmentation_sanitize.sanitize_artifacts, ws.report_html, ws.report_pptx
+            )
+            audit.append({"event": "dash_sanitize", **counts})
+            total = counts["html"] + counts["pptx"]
+            if total:
+                await emit("status", f"Cleaned {total} stray dash(es) from the deliverables "
+                                     f"(HTML {counts['html']}, PPTX {counts['pptx']}).")
+        except Exception:
+            logger.exception("dash sanitize failed for %s", run_id)
         return await finalize(RunStatus.succeeded, None)
     if state["subtype"] in _ERROR_SUBTYPES:
         err = f"agent ended with {state['subtype']}"
