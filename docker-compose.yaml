@@ -4,30 +4,26 @@ services:
       context: .
       dockerfile: Dockerfile
     image: survey_intelligence
-    environment:
-      - "ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}"
-      - "SURVEY_MONGO_URL=${SURVEY_MONGO_URL}"
-      - "SURVEY_MONGO_DB=${SURVEY_MONGO_DB}"
-      - "ANTHROPIC_MODEL=${ANTHROPIC_MODEL}"
-      - "MAX_GENERATE_RESPONDENTS=${MAX_GENERATE_RESPONDENTS}"
-      - "SEGMENTATION_MODEL=${SEGMENTATION_MODEL}"
-      - "FALLBACK_MODEL=${FALLBACK_MODEL}"
-      - "MAX_TURNS=${MAX_TURNS}"
-      - "MAX_BUDGET_USD=${MAX_BUDGET_USD}"
-      - "RUN_TIMEOUT_SECONDS=${RUN_TIMEOUT_SECONDS}"
-      - "MAX_CONCURRENT_RUNS=${MAX_CONCURRENT_RUNS}"
-      - "PORT_NUMBER=${PORT_NUMBER}"
-      - "DEV_MODE=${DEV_MODE}"
-      - "MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}"
-      - "PUBLIC_BASE_URL=${PUBLIC_BASE_URL}"
+    # All config (secrets + tunables) comes from .env so this list never drifts.
+    env_file:
+      - .env
     restart: always
     mem_limit: 4G
     mem_reservation: 1G
+    # Published on localhost only — nginx (syntheticdata.ddns.net) proxies to 127.0.0.1:$PORT_NUMBER.
     ports:
-      - "${PORT_NUMBER}:${PORT_NUMBER}"
+      - "127.0.0.1:${PORT_NUMBER}:${PORT_NUMBER}"
     volumes:
       - ./logs:/app/logs
       - ./uploads:/app/uploads
       - ./runs:/app/runs
       - ./exports:/app/exports
       - ./tracking:/app/tracking
+      # shared/ holds the result-link JSON files ("links survive restarts") — must persist.
+      - ./shared:/app/shared
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:'+os.environ['PORT_NUMBER'])\" || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s

@@ -1,0 +1,29 @@
+# VCS / Python caches
+.git
+.gitignore
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Host virtualenv — rebuilt inside the image by `uv sync`
+.venv/
+
+# Secrets — provided to the container via compose env_file, never baked into the image
+.env
+.env.local
+
+# Runtime state — bind-mounted as volumes at runtime (must not be copied in)
+logs/
+runs/
+uploads/
+exports/
+tracking/
+shared/
+*.log
+
+# Misc
+node_modules/
+.DS_Store
