@@ -272,6 +272,8 @@ Return ONLY a JSON object, no prose:
 Rules:
 - Every "label" MUST be copied EXACTLY from AVAILABLE LABELS. Do not invent labels.
 - Choose between 3 and 6 labels.
+- Write "approach" and each "reason" in light Markdown: wrap the 1-2 most important
+  terms in **bold**. "approach" may use a short "- " bullet list if it sharpens the logic.
 - Do not use em dashes anywhere in your text; use commas or periods."""
 
     msg = get_client().messages.create(

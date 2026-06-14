@@ -95,11 +95,26 @@
    area that pulls the loading/error line up under the button. Neutralize it here. */
 .seg-ai-plan .hint { margin-top: 6px; margin-bottom: 0; }
 .seg-approach {
-  font-style: italic;
-  color: var(--text);
+  color: var(--dim);
   border-left: 3px solid var(--gold-ink);
-  padding: 4px 0 4px 12px;
+  padding: 2px 0 2px 12px;
   margin-bottom: 10px;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.seg-approach p { margin: 0 0 6px; }
+.seg-approach p:last-child { margin-bottom: 0; }
+.seg-approach ul { margin: 4px 0 0; padding-left: 18px; }
+.seg-approach li { margin: 2px 0; }
+.seg-ai-plan strong { color: var(--text); font-weight: 700; }
+.seg-ai-plan em { font-style: italic; }
+.seg-ai-plan code {
+  font-family: ui-monospace, Menlo, monospace;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 0.9em;
 }
 .seg-axes-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .seg-axis {

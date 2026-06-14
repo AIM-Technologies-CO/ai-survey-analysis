@@ -12,6 +12,30 @@
     el.innerHTML = `<div class="hint" style="margin:10px 0 0;color:${c}">${html}</div>`;
   }
 
+  // ---- minimal, XSS-safe markdown (escape FIRST, then add only our own tags) ----
+  function mdInline(escaped) {
+    return escaped
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*([^*\n]+)\*/g, "<em>$1</em>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>");
+  }
+  function mdInlineSafe(raw) { return mdInline(escapeHtml(raw || "")); }
+  function renderMarkdown(raw) {
+    const esc = escapeHtml(raw || "").trim();
+    if (!esc) return "";
+    let html = "", para = [], list = [];
+    const flushPara = () => { if (para.length) { html += `<p>${mdInline(para.join("<br>"))}</p>`; para = []; } };
+    const flushList = () => { if (list.length) { html += `<ul>${list.map((li) => `<li>${mdInline(li)}</li>`).join("")}</ul>`; list = []; } };
+    for (const line of esc.split("\n")) {
+      const m = line.match(/^\s*[-*]\s+(.*)$/);
+      if (m) { flushPara(); list.push(m[1]); }            // bullet line -> group into <ul>
+      else if (line.trim() === "") { flushPara(); flushList(); }
+      else { flushList(); para.push(line); }              // text line -> paragraph
+    }
+    flushPara(); flushList();
+    return html;
+  }
+
   // Plain-language presentation of each event kind for the live activity log.
   const KIND_META = {
     status:         { icon: "•",  label: "" },
@@ -220,10 +244,10 @@
       segState.aiPlan = axes.map((a) => a.label);
       const list = axes.map((a) =>
         `<li class="seg-axis"><span class="ax-name">${escapeHtml(a.label)}</span>` +
-        (a.reason ? `<span class="ax-why">${escapeHtml(a.reason)}</span>` : "") + `</li>`).join("");
+        (a.reason ? `<span class="ax-why">${mdInlineSafe(a.reason)}</span>` : "") + `</li>`).join("");
       const enough = segState.aiPlan.length >= MIN_Q;
       out.innerHTML =
-        (d.approach ? `<div class="seg-approach">${escapeHtml(d.approach)}</div>` : "") +
+        (d.approach ? `<div class="seg-approach">${renderMarkdown(d.approach)}</div>` : "") +
         `<ul class="seg-axes-list">${list}</ul>` +
         `<div class="hint" style="margin-top:6px;color:${enough ? "var(--muted)" : "var(--bad)"}">` +
         (enough
