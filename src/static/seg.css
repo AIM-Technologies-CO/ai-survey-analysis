@@ -72,6 +72,29 @@
 .seg-datefilter input[type="date"] { min-width: 150px; }
 .seg-datefilter input:disabled { opacity: 0.5; }
 
+/* ---------- wave-over-wave date rows ---------- */
+#seg-wavefilter .seg-wave {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--gold-ink);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+#seg-wavefilter .seg-wave .filter-group { display: flex; flex-direction: column; gap: 4px; }
+#seg-wavefilter .seg-wave input[type="date"] { min-width: 150px; }
+.seg-wave-tag {
+  font-family: var(--serif);
+  font-weight: 700;
+  color: var(--gold-ink);
+  align-self: center;
+  min-width: 64px;
+}
+
 /* ---------- segment-by mode toggle ---------- */
 .seg-modes { display: flex; gap: 8px; margin: 10px 0 0; flex-wrap: wrap; }
 .seg-mode {

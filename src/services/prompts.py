@@ -95,6 +95,27 @@ PERSONAS_SCHEMA = """\
   ]
 }"""
 
+# Extra personas.json fields required ONLY in wave-over-wave mode. Builders render the
+# comparison sections when these are present, and ignore them otherwise.
+WAVE_SCHEMA_ADDENDUM = """\
+WAVE-OVER-WAVE ADDITIONS — the dataset has a `wave` column with two values. ALSO include:
+- Top level "waves": [
+    {"id": "wave1", "label": "<exact wave label>", "n": 512},
+    {"id": "wave2", "label": "<exact wave label>", "n": 488}
+  ]
+- In EACH persona, add:
+    "wave_sizes": [
+      {"wave": "<wave1 label>", "count": 180, "pct": 35.2},
+      {"wave": "<wave2 label>", "count": 150, "pct": 30.7}
+    ],
+    "shift": "one sentence on how this persona changed between waves, stating the point delta"
+- Top level "shifts_summary": [
+    {"persona": "The Social Scroller", "wave1_pct": 35.2, "wave2_pct": 30.7,
+     "delta_pts": -4.5, "direction": "shrinking", "note": "what it means for ad budget over time"}
+  ]
+Keep the SAME personas (identical names, colors, definitions) across both waves; only their
+sizes, stats, and emphasis change. `size_count`/`size_pct` should reflect the COMBINED dataset."""
+
 CHART_STYLE = """\
 import matplotlib
 matplotlib.use("Agg")
@@ -169,6 +190,7 @@ def build_task_prompt(
     segment_by: list[str] | None,
     additional_details: str,
     data_dictionary_md: str,
+    waves: list[dict] | None = None,
 ) -> str:
     if segment_by:
         seg_block = (
@@ -185,15 +207,54 @@ def build_task_prompt(
 
     details_block = additional_details.strip() or "(none provided)"
 
+    # --- wave-over-wave conditional fragments (empty in single-snapshot mode) ---
+    if waves:
+        wlines = []
+        for w in waves:
+            df, dt = w.get("date_from"), w.get("date_to")
+            rng = f"{df.date() if df else 'start'} to {dt.date() if dt else 'latest'}"
+            wlines.append(f'  - "{w["label"]}": submitDate {rng}')
+        title_goal = "Wave-over-wave audience-shift report — analysis, then parallel rendering"
+        wave_context = (
+            "\n## WAVE-OVER-WAVE COMPARISON MODE\n"
+            "This Excel combines TWO time periods of the SAME survey, tagged by a `wave` column:\n"
+            + "\n".join(wlines)
+            + "\nYour report COMPARES the audience across these waves: build ONE consistent set of "
+            "personas, size each WITHIN each wave, and quantify how the audience shifted over time. "
+            "Apply STEP 0 filtering within each wave.\n"
+        )
+        persona_step_extra = (
+            " Define the personas ONCE on the combined dataset (so they are identical across "
+            "waves), then compute each persona's size and key stats SEPARATELY within each wave."
+        )
+        schema_block = PERSONAS_SCHEMA + "\n\n" + WAVE_SCHEMA_ADDENDUM
+        chart_extra = (
+            "\n   Make the `overview_chart` a GROUPED bar chart comparing every persona's % across "
+            "the two waves (one group per persona, one bar per wave). Per-persona charts should show "
+            "their key metric changing between waves."
+        )
+        shift_step = (
+            "\n## STEP 4b — QUANTIFY THE SHIFT\n"
+            "Populate `waves`, each persona's `wave_sizes` + `shift`, and `shifts_summary`. Call out "
+            "which segments are GROWING vs SHRINKING and what that implies for moving ad budget over time.\n"
+        )
+    else:
+        title_goal = "Audience-segmentation persona report — analysis, then parallel rendering"
+        wave_context = ""
+        persona_step_extra = ""
+        schema_block = PERSONAS_SCHEMA
+        chart_extra = ""
+        shift_step = ""
+
     return f"""\
-# TASK: Audience-segmentation persona report — analysis, then parallel rendering
+# TASK: {title_goal}
 
 ## Input
 Survey Excel: {input_rel}  (relative to your working directory)
 Column overview (also in DATA_DICTIONARY.md):
 
 {data_dictionary_md}
-
+{wave_context}
 ## STEP 0 — MANDATORY RESPONDENT FILTERING (FIRST, before any analysis)
 Keep ONLY respondents where BOTH hold:
   1. `status` == "submitted"  (case-insensitive, trimmed)
@@ -209,24 +270,24 @@ cross-tabulations. {seg_block}
 
 ## STEP 2 — DERIVE 3–6 DISTINCT PERSONAS (analyst judgment)
 Non-overlapping, sized, each fully characterized across demographics, behaviors,
-content preferences, and ad receptivity — every bullet backed by a real number.
+content preferences, and ad receptivity — every bullet backed by a real number.{persona_step_extra}
 
 ## STEP 3 — PRODUCE THE SHARED RENDERING ASSETS (this exact contract)
 1. `{work_rel}/personas.json` — matching this schema exactly (assign persona colors
    in the listed order):
 
 ```json
-{PERSONAS_SCHEMA}
+{schema_block}
 ```
 
 2. `{work_rel}/charts/` — ONE overview chart (persona sizes) + 1–2 charts per persona
    (their most differentiating distributions), filenames referenced from personas.json.
-   Use EXACTLY this style so both deliverables match:
+   Use EXACTLY this style so both deliverables match:{chart_extra}
 
 ```python
 {CHART_STYLE}
 ```
-
+{shift_step}
 ## STEP 4 — RENDER BOTH DELIVERABLES IN PARALLEL
 Invoke BOTH builder agents in a SINGLE message (two Agent tool calls together, so they
 run concurrently):

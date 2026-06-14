@@ -9,6 +9,12 @@ from pydantic import BaseModel, Field
 from models.segmentation import ProgressEvent
 
 
+class WaveWindow(BaseModel):
+    label: str = Field(description="Display label for the wave, e.g. 'Wave 1 (2024)'")
+    date_from: str | None = Field(default=None, description="Lower submitDate bound 'YYYY-MM-DD'")
+    date_to: str | None = Field(default=None, description="Upper submitDate bound 'YYYY-MM-DD'")
+
+
 class RunRequest(BaseModel):
     source: Literal["mongo", "upload"] = Field(description="Where the survey data comes from")
     ref: str = Field(description="survey_id (mongo) or upload_id (upload)")
@@ -17,6 +23,7 @@ class RunRequest(BaseModel):
     date_from: str | None = Field(default=None, description="Lower submitDate bound 'YYYY-MM-DD' (mongo source only)")
     date_to: str | None = Field(default=None, description="Upper submitDate bound 'YYYY-MM-DD' (mongo source only)")
     include_all: bool = Field(default=True, description="Ignore the date range and use all submissions")
+    waves: list[WaveWindow] | None = Field(default=None, description="Two date windows for wave-over-wave comparison (mongo only); overrides the single date filter")
 
 
 class SuggestAxesRequest(BaseModel):

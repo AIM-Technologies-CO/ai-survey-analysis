@@ -47,6 +47,11 @@ design system exactly (AIM dark editorial).
   - Charts on panel cards below (max 2 per row), captions 11px muted.
   - Placement callout: panel-alt strip with persona-color left border 3px:
     `Reach them: {channel} · {format} · {angle}` — 13px, channel/format/angle values bold.
+- **Audience shift** (ONLY if personas.json has `waves`): insert right after Audience overview —
+  a full-width `shifts_summary` table (PERSONA / {wave1}% / {wave2}% / Δ PTS / WHAT IT MEANS),
+  the Δ cell colored by direction (#00FF96 with ▲ up, #FF4D6D with ▼ down), a one-line headline
+  above it; and add the wave-shift line + `shift` copy to each persona header. See the design
+  system's "Wave-over-wave mode". Renumber the sections that follow.
 - **Implications**: full-width table on panel; header small-caps muted; persona names in
   their colors; zebra rows panel/panel-alt; hairline rules only.
 - **Closing**: centered Georgia 20px with one italic accent-green phrase; recap 11px muted.

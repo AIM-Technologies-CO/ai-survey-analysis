@@ -81,6 +81,26 @@ always canvas (#0A0E27) for contrast. Never reassign colors between formats.
 6. **Closing** — one-paragraph takeaway (Georgia, with one italic accent phrase) +
    small-print recap.
 
+## Wave-over-wave mode (render ONLY when personas.json has a top-level `waves` field)
+
+This is a comparison of the SAME survey across two time periods. When `waves` is present,
+adapt the document (and renumber sections after the insert):
+
+- **Cover** subtitle names BOTH periods and their Ns, e.g. `Survey · Wave 1 (n=512) vs Wave 2 (n=488)`.
+- **Audience overview** — `overview_chart` is the GROUPED wave bar chart (persona × wave);
+  the kicker states the single biggest shift in plain words.
+- **NEW section "Audience shift"** (insert right AFTER Audience overview, before the persona
+  sections): render `shifts_summary` as a table — columns `PERSONA | {wave1 label} % |
+  {wave2 label} % | Δ PTS | WHAT IT MEANS`. Persona names in their color. The Δ cell shows the
+  signed point change with a ▲ in accent green (#00FF96) when growing, ▼ in #FF4D6D when
+  shrinking, muted dash when flat. Lead with a one-line headline takeaway (which segment is
+  rising/falling fastest).
+- **Each persona section** gains a **wave-shift line** from its `wave_sizes`:
+  `{wave1 label} {pct}% → {wave2 label} {pct}%  (Δ +X.X pts ▲)` colored by direction, with the
+  persona's `shift` sentence as supporting copy. Demographics/behaviors/etc. describe the
+  COMBINED audience unless a bullet explicitly calls out a wave change.
+- Direction colors everywhere: up = #00FF96, down = #FF4D6D, flat = #8A93B0.
+
 ## Inputs you read (never invent data)
 
 - `work/personas.json` — every number, name, tagline, bullet, and implication you render.
@@ -88,7 +108,8 @@ always canvas (#0A0E27) for contrast. Never reassign colors between formats.
   `removed_exclude`, `final_n`, `approach`, `limitations`), `personas[]` (`name`, `tagline`,
   `size_count`, `size_pct`, `color` hex, `demographics[]`, `behaviors[]`, `content[]`,
   `ad_receptivity[]`, `placement` {`channel`,`format`,`angle`}, `charts[]` filenames),
-  `overview_chart`, `implications_summary`.
+  `overview_chart`, `implications_summary`. In wave mode it ALSO has `waves`, per-persona
+  `wave_sizes` + `shift`, and `shifts_summary` (see "Wave-over-wave mode" above).
 - `work/charts/*.png` — pre-rendered dark-theme charts (panel background, persona colors).
   Embed as-is (HTML: base64 data URIs; PPTX: insert the PNGs). Do NOT regenerate or restyle.
 

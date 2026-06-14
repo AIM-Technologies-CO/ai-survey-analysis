@@ -45,31 +45,17 @@ def build_data_dictionary(survey_id: str) -> dict[str, str]:
     return out
 
 
-def export_survey_to_xlsx(
-    survey_id: str,
-    dest_path: str | Path,
-    *,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
-    include_all: bool = True,
-) -> dict:
-    """Write usable respondents of a survey to a flat Excel at dest_path.
-
-    When ``include_all`` is False, the cohort is narrowed to submitDate in
-    [date_from, date_to]. Defaults preserve the original behavior (all dates).
-    """
+def _collect_rows(survey_id: str, match: dict, ordered_labels: list[str], extra: dict | None = None) -> list[dict]:
+    """Build flat respondent rows for a Mongo match, appending any new question
+    labels to the shared `ordered_labels` (so multiple cohorts share one column set).
+    `extra` adds constant columns to every row (e.g. a wave label)."""
     db = data.get_db()
-    match = data._eligible_match(
-        survey_id, date_from=date_from, date_to=date_to, include_all=include_all
-    )
     projection = {"_id": 1, "status": 1, "submitDate": 1, "questions": 1}
-
     cap = settings.segmentation_row_cap
     cursor = db.respondents.find(match, projection)
     if cap and cap > 0:
         cursor = cursor.limit(cap)
 
-    ordered_labels: list[str] = []
     rows: list[dict] = []
     for r in cursor:
         row: dict = {
@@ -77,6 +63,8 @@ def export_survey_to_xlsx(
             "status": r.get("status"),
             "submitDate": data.jsonable(r.get("submitDate")),
         }
+        if extra:
+            row.update(extra)
         for q in r.get("questions", []) or []:
             label = q.get("label") or q.get("header")
             if not label or label in _META_COLS:
@@ -90,6 +78,27 @@ def export_survey_to_xlsx(
                 if label not in ordered_labels:
                     ordered_labels.append(label)
         rows.append(row)
+    return rows
+
+
+def export_survey_to_xlsx(
+    survey_id: str,
+    dest_path: str | Path,
+    *,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    include_all: bool = True,
+) -> dict:
+    """Write usable respondents of a survey to a flat Excel at dest_path.
+
+    When ``include_all`` is False, the cohort is narrowed to submitDate in
+    [date_from, date_to]. Defaults preserve the original behavior (all dates).
+    """
+    match = data._eligible_match(
+        survey_id, date_from=date_from, date_to=date_to, include_all=include_all
+    )
+    ordered_labels: list[str] = []
+    rows = _collect_rows(survey_id, match, ordered_labels)
 
     columns = _META_COLS + ordered_labels
     df = pd.DataFrame(rows).reindex(columns=columns)
@@ -102,3 +111,33 @@ def export_survey_to_xlsx(
         survey_id, dest, len(rows), len(ordered_labels),
     )
     return {"rows": len(rows), "labels": ordered_labels, "columns": columns}
+
+
+def export_waves_to_xlsx(survey_id: str, dest_path: str | Path, windows: list[dict]) -> dict:
+    """Write a wave-over-wave dataset: one Excel where each row carries a ``wave``
+    column. ``windows`` = [{"label","date_from","date_to"}], pulled in order and
+    tagged so the agent can compare the same survey across time periods.
+    Returns per-wave counts so the caller can confirm both waves are non-empty."""
+    ordered_labels: list[str] = []
+    all_rows: list[dict] = []
+    wave_counts: list[dict] = []
+    for w in windows:
+        match = data._eligible_match(
+            survey_id, date_from=w.get("date_from"), date_to=w.get("date_to"), include_all=False
+        )
+        rows = _collect_rows(survey_id, match, ordered_labels, extra={"wave": w["label"]})
+        wave_counts.append({"label": w["label"], "rows": len(rows)})
+        all_rows.extend(rows)
+
+    # `wave` leads so it's the obvious grouping column; metadata then question labels.
+    columns = ["wave"] + _META_COLS + ordered_labels
+    df = pd.DataFrame(all_rows).reindex(columns=columns)
+    dest = Path(dest_path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    df.to_excel(dest, index=False, engine="openpyxl")
+
+    logger.info(
+        "wave export %s -> %s (%s, %d label columns)",
+        survey_id, dest, ", ".join(f"{c['label']}={c['rows']}" for c in wave_counts), len(ordered_labels),
+    )
+    return {"rows": len(all_rows), "labels": ordered_labels, "columns": columns, "waves": wave_counts}

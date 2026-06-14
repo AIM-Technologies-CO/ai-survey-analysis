@@ -97,6 +97,7 @@ async def run_segmentation(
     segment_by: list[str] | None = None,
     additional_details: str = "",
     question_text: dict[str, str] | None = None,
+    waves: list[dict] | None = None,
     on_event: OnEvent | None = None,
     run_id: str | None = None,
 ) -> SegmentationResult:
@@ -129,6 +130,7 @@ async def run_segmentation(
         segment_by=segment_by,
         additional_details=additional_details,
         data_dictionary_md=ws.data_dictionary_text,
+        waves=waves,
     )
 
     state = {"session_id": None, "num_turns": 0, "cost": None, "subtype": None, "errors": None, "sentinel": False}

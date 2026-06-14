@@ -163,10 +163,14 @@ async def start_run(req: RunRequest):
     if req.segment_by and len(req.segment_by) < 3:
         raise HTTPException(400, "Choose at least 3 question labels, or let the AI choose the segments.")
 
-    # Date range applies to the database source only (uploads have no guaranteed date column).
+    # Date range + wave comparison apply to the database source only (uploads have no
+    # guaranteed date column).
     date_from = date_to = None
     include_all = True
+    waves_parsed: list[dict] | None = None
     if req.source == "upload":
+        if req.waves:
+            raise HTTPException(400, "Wave-over-wave comparison needs the database source")
         path = excel_inspector.upload_path(req.ref)
         if not path.exists():
             raise HTTPException(404, f"Upload not found: {req.ref}")
@@ -183,16 +187,41 @@ async def start_run(req: RunRequest):
             raise HTTPException(404, f"Survey not found: {req.ref}")
         except PyMongoError as e:
             raise HTTPException(503, "database unavailable") from e
-        try:
-            date_from = data.parse_submit_date(req.date_from)
-            date_to = data.parse_submit_date(req.date_to)
-        except ValueError:
-            raise HTTPException(400, "Invalid date; use YYYY-MM-DD")
-        include_all = req.include_all or (date_from is None and date_to is None)
+
+        if req.waves:
+            if len(req.waves) != 2:
+                raise HTTPException(400, "Wave-over-wave needs exactly two waves")
+            waves_parsed = []
+            for i, w in enumerate(req.waves):
+                try:
+                    wf = data.parse_submit_date(w.date_from)
+                    wt = data.parse_submit_date(w.date_to)
+                except ValueError:
+                    raise HTTPException(400, "Invalid wave date; use YYYY-MM-DD")
+                if wf is None and wt is None:
+                    raise HTTPException(400, f"Wave '{w.label}' needs at least one date bound")
+                n = await run_in_threadpool(
+                    data.count_eligible, req.ref, date_from=wf, date_to=wt, include_all=False
+                )
+                if n == 0:
+                    raise HTTPException(400, f"Wave '{w.label}' has no eligible respondents in that range")
+                label = (w.label or "").strip() or f"Wave {i + 1}"
+                waves_parsed.append({"label": label, "date_from": wf, "date_to": wt})
+            # the wave column needs distinct values
+            if waves_parsed[0]["label"] == waves_parsed[1]["label"]:
+                waves_parsed[1]["label"] += " (2)"
+        else:
+            try:
+                date_from = data.parse_submit_date(req.date_from)
+                date_to = data.parse_submit_date(req.date_to)
+            except ValueError:
+                raise HTTPException(400, "Invalid date; use YYYY-MM-DD")
+            include_all = req.include_all or (date_from is None and date_to is None)
 
     state = job_registry.create_job(
         req.source, req.ref, req.segment_by, req.additional_details,
         date_from=date_from, date_to=date_to, include_all=include_all,
+        waves=waves_parsed,
     )
     job_registry.launch(state.job_id)
     logger.info("Started segmentation run %s (source=%s ref=%s)", state.job_id, req.source, req.ref)

@@ -38,6 +38,8 @@ class JobState:
     date_from: datetime | None = None
     date_to: datetime | None = None
     include_all: bool = True
+    # wave-over-wave: list of {"label": str, "date_from": datetime|None, "date_to": datetime|None}
+    waves: list[dict] | None = None
     status: str = RunStatus.queued.value
     events: list[ProgressEvent] = field(default_factory=list)
     error: str | None = None
@@ -63,6 +65,7 @@ def create_job(
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     include_all: bool = True,
+    waves: list[dict] | None = None,
 ) -> JobState:
     job_id = uuid.uuid4().hex
     state = JobState(
@@ -75,6 +78,7 @@ def create_job(
         date_from=date_from,
         date_to=date_to,
         include_all=include_all,
+        waves=waves,
     )
     _jobs[job_id] = state
     return state
@@ -110,6 +114,20 @@ async def _materialize_input(state: JobState) -> tuple[Path, dict[str, str] | No
     dest = state.run_dir / "survey.xlsx"
 
     if state.source == "mongo":
+        if state.waves:
+            labels = " vs ".join(w["label"] for w in state.waves)
+            state.add_event(ProgressEvent(kind="status", message=f"Exporting wave-over-wave data ({labels})…"))
+            info = await asyncio.to_thread(
+                segmentation_export.export_waves_to_xlsx, state.ref, dest, state.waves
+            )
+            per = ", ".join(f"{c['label']}: {c['rows']}" for c in info["waves"])
+            state.add_event(ProgressEvent(
+                kind="status",
+                message=f"Exported {info['rows']} respondents across waves ({per}) × {len(info['labels'])} questions",
+            ))
+            question_text = await asyncio.to_thread(segmentation_export.build_data_dictionary, state.ref)
+            return dest, question_text
+
         if state.include_all:
             window = "all submission dates"
         else:
@@ -159,6 +177,7 @@ async def _run(job_id: str) -> None:
                     segment_by=state.segment_by,
                     additional_details=state.additional_details,
                     question_text=question_text,
+                    waves=state.waves,
                     on_event=on_event,
                     run_id=job_id,
                 )
