@@ -519,6 +519,92 @@ def _period_label(a: datetime, b: datetime) -> str:
     return f"{a:%b} {a.day}, {a.year} to {b:%b} {b.day}, {b.year}"
 
 
+_WAVE_TOKEN_RES = [
+    re.compile(r"[-\s]+w\s*\d+\b", re.I),                 # -W3, W 4
+    re.compile(r"\bwave\s*\d+\b", re.I),                  # wave 2
+    re.compile(r"\b(round|phase)\s*\d+\b", re.I),
+    re.compile(r"\bq[1-4]\b", re.I),                      # Q1..Q4
+    re.compile(r"\b20\d{2}\b"),                           # 2024
+    re.compile(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b", re.I),
+    re.compile(r"\b\d{1,2}\s*/\s*\d{1,2}\b"),             # 19/4
+]
+
+
+def _survey_name_base(name: str) -> str:
+    """Normalize a survey name to its wave-family base by stripping wave/period/time
+    tokens (Wave N, W3, Q1, a year, a month, d/m) and punctuation. Two surveys with the
+    same base are treated as waves of the same tracker."""
+    s = " " + (name or "").lower() + " "
+    for rx in _WAVE_TOKEN_RES:
+        s = rx.sub(" ", s)
+    s = re.sub(r"[^a-z0-9]+", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _wave_label_from_name(name: str, start: datetime | None) -> str:
+    """A short distinguishing tag for a sibling survey: its year / wave token / month, else date."""
+    for rx, fmt in [
+        (re.compile(r"\b(20\d{2})\b"), "{0}"),
+        (re.compile(r"[-\s]w\s*(\d+)", re.I), "W{0}"),
+        (re.compile(r"\bwave\s*(\d+)\b", re.I), "Wave {0}"),
+        (re.compile(r"\bq([1-4])\b", re.I), "Q{0}"),
+    ]:
+        m = rx.search(name or "")
+        if m:
+            return fmt.format(m.group(1))
+    if start:
+        return start.strftime("%b %Y")
+    return (name or "Wave")[:24].strip()
+
+
+def detect_survey_waves(survey_id: str) -> dict:
+    """Find sibling surveys that share a base name (a tracker fielded across time).
+
+    Returns ``{"family_capable": bool, "waves": [{survey_id, name, label, period,
+    date_from, date_to, n}]}`` ordered by startDate. Each member is a whole separate
+    survey (no date window). ``family_capable`` is True when 2+ surveys share the base."""
+    db = get_db()
+    target = db.surveys.find_one({"_id": _to_object_id(survey_id)}, {"name": 1})
+    if not target:
+        return {"family_capable": False, "waves": []}
+    base = _survey_name_base(target.get("name", ""))
+    if not base:
+        return {"family_capable": False, "waves": []}
+
+    members = [
+        s for s in db.surveys.find({}, {"name": 1})
+        if _survey_name_base(s.get("name", "")) == base
+    ]
+
+    waves = []
+    for s in members:
+        sid = str(s["_id"])
+        # Real fielding time + size from the responses (survey startDate is unreliable here).
+        stats = list(db.respondents.aggregate([
+            {"$match": _eligible_match(sid, include_all=True)},
+            {"$group": {"_id": None, "n": {"$sum": 1},
+                        "min": {"$min": "$submitDate"}, "max": {"$max": "$submitDate"}}},
+        ], allowDiskUse=True))
+        row = stats[0] if stats else {}
+        n, lo, hi = row.get("n", 0), row.get("min"), row.get("max")
+        if not n or lo is None:
+            continue  # a wave with no eligible respondents can't be compared
+        waves.append({
+            "survey_id": sid,
+            "name": (s.get("name") or "").strip(),
+            "label": _wave_label_from_name(s.get("name", ""), lo),
+            "period": _period_label(lo, hi or lo),
+            "date_from": None,
+            "date_to": None,
+            "_sort": lo,
+            "n": n,
+        })
+    waves.sort(key=lambda w: w["_sort"])
+    for w in waves:
+        del w["_sort"]
+    return {"family_capable": len(waves) >= 2, "waves": waves}
+
+
 def detect_waves(survey_id: str, *, gap_days: int = 21) -> dict:
     """Detect collection waves from gaps in the submission timeline.
 

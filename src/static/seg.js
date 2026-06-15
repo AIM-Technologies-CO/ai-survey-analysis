@@ -4,7 +4,9 @@
   const MIN_Q = 3;
   const segState = {
     source: "mongo", ref: null, selected: new Set(), mode: "ai", aiPlan: null,
-    compareWaves: false, waveCapable: false, detectedWaves: [],
+    compareWaves: false, waveMode: "date",
+    gapCapable: false, detectedWaves: [],
+    waveFamilyCapable: false, waveFamily: [],
     jobId: null, lastIdx: 0, timer: null, loaded: false, recountTimer: null,
   };
 
@@ -129,8 +131,10 @@
       const d = await api(`/api/segmentation/surveys/${sv.id}`);
       segState.ref = d.id;
       segState.dateBounds = d.date_bounds || null;
-      segState.waveCapable = !!d.wave_capable;
+      segState.gapCapable = !!d.wave_capable;
       segState.detectedWaves = d.detected_waves || [];
+      segState.waveFamilyCapable = !!d.wave_family_capable;
+      segState.waveFamily = d.wave_family || [];
       $("#seg-source-status").innerHTML = "";
       renderCounts(d.counts);
       renderLabels(d.candidate_labels);
@@ -275,8 +279,10 @@
 
   function initDateFilter() {
     const isMongo = segState.source === "mongo";
-    // The wave toggle appears ONLY when the survey actually has 2+ detected waves.
-    $("#seg-scopebar").classList.toggle("hidden", !(isMongo && segState.waveCapable));
+    // The wave toggle appears ONLY when the survey has 2+ sibling-survey waves (a tracker)
+    // OR 2+ submission-gap waves.
+    const waveCap = segState.waveFamilyCapable || segState.gapCapable;
+    $("#seg-scopebar").classList.toggle("hidden", !(isMongo && waveCap));
     if (!isMongo) { $("#seg-datefilter").classList.add("hidden"); $("#seg-wavefilter").classList.add("hidden"); segState.compareWaves = false; return; }
     resetScopeToSingle();
     const b = segState.dateBounds || {};
@@ -290,17 +296,33 @@
 
   function renderWaveList() {
     const root = $("#seg-wave-list");
-    root.innerHTML = segState.detectedWaves.map((w, i) =>
-      `<label class="seg-wave-item"><input type="checkbox" value="${i}" checked />` +
-      `<span class="ww-tag">${escapeHtml(w.label)}</span>` +
-      `<span class="ww-period">${escapeHtml(w.period || "")}</span>` +
-      `<span class="ww-n">${w.n} resp.</span></label>`).join("");
+    const hint = $("#seg-wave-hint");
+    if (segState.waveFamilyCapable && segState.waveFamily.length >= 2) {
+      // Sibling-survey waves (a tracker). Default: only the opened survey is checked.
+      segState.waveMode = "family";
+      root.innerHTML = segState.waveFamily.map((w, i) =>
+        `<label class="seg-wave-item"><input type="checkbox" value="${i}" ${w.survey_id === segState.ref ? "checked" : ""} />` +
+        `<span class="ww-tag">${escapeHtml(w.label)}</span>` +
+        `<span class="ww-period">${escapeHtml(w.name || "")}${w.period ? " · " + escapeHtml(w.period) : ""}</span>` +
+        `<span class="ww-n">${w.n} resp.</span></label>`).join("");
+      if (hint) hint.textContent = "Sibling surveys of the same tracker. Tick 2 or more to compare.";
+    } else {
+      // Submission-gap waves of this one survey.
+      segState.waveMode = "date";
+      root.innerHTML = segState.detectedWaves.map((w, i) =>
+        `<label class="seg-wave-item"><input type="checkbox" value="${i}" checked />` +
+        `<span class="ww-tag">${escapeHtml(w.label)}</span>` +
+        `<span class="ww-period">${escapeHtml(w.period || "")}</span>` +
+        `<span class="ww-n">${w.n} resp.</span></label>`).join("");
+      if (hint) hint.textContent = "Submission waves detected in this survey. Tick 2 or more to compare.";
+    }
     root.querySelectorAll("input").forEach((cb) => cb.addEventListener("change", updateSel));
   }
 
   function selectedWaves() {
+    const src = segState.waveMode === "family" ? segState.waveFamily : segState.detectedWaves;
     return [...$("#seg-wave-list").querySelectorAll("input:checked")]
-      .map((cb) => segState.detectedWaves[+cb.value])
+      .map((cb) => src[+cb.value])
       .filter(Boolean);
   }
 
@@ -384,9 +406,9 @@
         additional_details: $("#seg-details").value,
       };
       if (segState.source === "mongo" && segState.compareWaves) {
-        payload.waves = selectedWaves().map((w) => ({
-          label: w.label, date_from: w.date_from, date_to: w.date_to,
-        }));
+        payload.waves = selectedWaves().map((w) => w.survey_id
+          ? { label: w.label, survey_id: w.survey_id }                 // sibling-survey wave
+          : { label: w.label, date_from: w.date_from, date_to: w.date_to });  // date-slice wave
       } else {
         const includeAll = segState.source !== "mongo" || $("#seg-include-all").checked;
         payload.include_all = includeAll;

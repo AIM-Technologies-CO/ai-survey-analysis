@@ -35,6 +35,7 @@ def survey_detail(survey_id: str):
         questions = data.get_survey_questions(survey_id)
         bounds = data.submit_date_bounds(survey_id)
         waves = data.detect_waves(survey_id)
+        family = data.detect_survey_waves(survey_id)
     except KeyError:
         raise HTTPException(404, "survey not found")
     except PyMongoError as e:
@@ -61,6 +62,8 @@ def survey_detail(survey_id: str):
         date_bounds=bounds,
         wave_capable=waves["wave_capable"],
         detected_waves=waves["waves"],
+        wave_family_capable=family["family_capable"],
+        wave_family=family["waves"],
     )
 
 
@@ -197,18 +200,23 @@ async def start_run(req: RunRequest):
             waves_parsed = []
             seen_labels: dict[str, int] = {}
             for i, w in enumerate(req.waves):
+                # A wave is either a sibling survey (survey_id, whole cohort) or a date
+                # window of the base survey (no survey_id -> req.ref + date bounds).
+                wsid = (w.survey_id or "").strip() or req.ref
                 try:
                     wf = data.parse_submit_date(w.date_from)
                     wt = data.parse_submit_date(w.date_to)
                 except ValueError:
                     raise HTTPException(400, "Invalid wave date; use YYYY-MM-DD")
-                if wf is None and wt is None:
-                    raise HTTPException(400, f"Wave '{w.label}' needs at least one date bound")
-                n = await run_in_threadpool(
-                    data.count_eligible, req.ref, date_from=wf, date_to=wt, include_all=False
-                )
+                whole = wf is None and wt is None  # whole survey (sibling / opened survey)
+                try:
+                    n = await run_in_threadpool(
+                        data.count_eligible, wsid, date_from=wf, date_to=wt, include_all=whole,
+                    )
+                except Exception as e:
+                    raise HTTPException(400, f"Wave '{w.label}': could not read survey ({e})")
                 if n == 0:
-                    raise HTTPException(400, f"Wave '{w.label}' has no eligible respondents in that range")
+                    raise HTTPException(400, f"Wave '{w.label}' has no eligible respondents")
                 label = (w.label or "").strip() or f"Wave {i + 1}"
                 # the `wave` column needs distinct values — suffix any duplicate label
                 if label in seen_labels:
@@ -216,7 +224,7 @@ async def start_run(req: RunRequest):
                     label = f"{label} ({seen_labels[label]})"
                 else:
                     seen_labels[label] = 1
-                waves_parsed.append({"label": label, "date_from": wf, "date_to": wt})
+                waves_parsed.append({"label": label, "survey_id": wsid, "date_from": wf, "date_to": wt})
         else:
             try:
                 date_from = data.parse_submit_date(req.date_from)

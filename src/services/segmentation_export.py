@@ -115,17 +115,19 @@ def export_survey_to_xlsx(
 
 def export_waves_to_xlsx(survey_id: str, dest_path: str | Path, windows: list[dict]) -> dict:
     """Write a wave-over-wave dataset: one Excel where each row carries a ``wave``
-    column. ``windows`` = [{"label","date_from","date_to"}], pulled in order and
-    tagged so the agent can compare the same survey across time periods.
-    Returns per-wave counts so the caller can confirm both waves are non-empty."""
+    column. ``windows`` = [{"label", "survey_id"?, "date_from"?, "date_to"?}]. Each wave
+    is pulled either from a sibling survey (its own ``survey_id``, whole cohort) or as a
+    date window of the base survey, then tagged with its label. Returns per-wave counts."""
     ordered_labels: list[str] = []
     all_rows: list[dict] = []
     wave_counts: list[dict] = []
     for w in windows:
+        sid = w.get("survey_id") or survey_id
+        whole = w.get("date_from") is None and w.get("date_to") is None
         match = data._eligible_match(
-            survey_id, date_from=w.get("date_from"), date_to=w.get("date_to"), include_all=False
+            sid, date_from=w.get("date_from"), date_to=w.get("date_to"), include_all=whole
         )
-        rows = _collect_rows(survey_id, match, ordered_labels, extra={"wave": w["label"]})
+        rows = _collect_rows(sid, match, ordered_labels, extra={"wave": w["label"]})
         wave_counts.append({"label": w["label"], "rows": len(rows)})
         all_rows.extend(rows)
 

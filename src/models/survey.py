@@ -38,5 +38,9 @@ class SurveyDetail(BaseModel):
     )
     wave_capable: bool = Field(default=False, description="True when the survey has 2+ collection waves (gaps in the submission timeline)")
     detected_waves: list[dict] | None = Field(
-        default=None, description="Detected waves: [{label, period, date_from, date_to, n}], time-ordered"
+        default=None, description="Date-slice waves from submission gaps: [{label, period, date_from, date_to, n}]"
+    )
+    wave_family_capable: bool = Field(default=False, description="True when 2+ sibling surveys share this survey's base name (a tracker fielded over time)")
+    wave_family: list[dict] | None = Field(
+        default=None, description="Sibling-survey waves: [{survey_id, name, label, period, n}], time-ordered"
     )

@@ -216,12 +216,13 @@ def build_task_prompt(
         title_goal = "Wave-over-wave audience-shift report — analysis, then parallel rendering"
         wave_context = (
             "\n## WAVE-OVER-WAVE COMPARISON MODE\n"
-            f"This Excel combines {n_waves} time periods (waves) of the SAME survey, tagged by a "
-            "`wave` column (use these EXACT labels, they are in time order):\n"
+            f"This Excel combines {n_waves} time periods (waves) of the SAME survey/tracker, tagged "
+            "by a `wave` column (use these EXACT labels, they are in time order):\n"
             + "\n".join(wlines)
-            + "\nYour report COMPARES the audience across these waves: build ONE consistent set of "
-            "personas, size each WITHIN each wave, and quantify how the audience shifted over time. "
-            "Apply STEP 0 filtering within each wave.\n"
+            + "\nWaves may be separate fieldings, so a few questions can appear in only some waves; "
+            "base the comparison on questions present across the waves. Your report COMPARES the "
+            "audience across these waves: build ONE consistent set of personas, size each WITHIN each "
+            "wave, and quantify how the audience shifted over time. Apply STEP 0 filtering within each wave.\n"
         )
         persona_step_extra = (
             " Define the personas ONCE on the combined dataset (so they are identical across all "

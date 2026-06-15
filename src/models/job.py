@@ -10,9 +10,10 @@ from models.segmentation import ProgressEvent
 
 
 class WaveWindow(BaseModel):
-    label: str = Field(description="Display label for the wave, e.g. 'Wave 1 (2024)'")
-    date_from: str | None = Field(default=None, description="Lower submitDate bound 'YYYY-MM-DD'")
-    date_to: str | None = Field(default=None, description="Upper submitDate bound 'YYYY-MM-DD'")
+    label: str = Field(description="Display label for the wave, e.g. '2024' or 'W3'")
+    survey_id: str | None = Field(default=None, description="Sibling survey for this wave (name+time family); when set, the whole survey is used and dates are ignored")
+    date_from: str | None = Field(default=None, description="Lower submitDate bound 'YYYY-MM-DD' (date-slice waves)")
+    date_to: str | None = Field(default=None, description="Upper submitDate bound 'YYYY-MM-DD' (date-slice waves)")
 
 
 class RunRequest(BaseModel):
