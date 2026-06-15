@@ -98,23 +98,21 @@ PERSONAS_SCHEMA = """\
 # Extra personas.json fields required ONLY in wave-over-wave mode. Builders render the
 # comparison sections when these are present, and ignore them otherwise.
 WAVE_SCHEMA_ADDENDUM = """\
-WAVE-OVER-WAVE ADDITIONS — the dataset has a `wave` column with two values. ALSO include:
-- Top level "waves": [
-    {"id": "wave1", "label": "<exact wave label>", "n": 512},
-    {"id": "wave2", "label": "<exact wave label>", "n": 488}
-  ]
+WAVE-OVER-WAVE ADDITIONS — the dataset has a `wave` column with TWO OR MORE values (the
+waves listed in the task, in time order). ALSO include, using EXACTLY those wave labels:
+- Top level "waves": one entry per wave, in time order:
+    [{"id": "wave1", "label": "<exact wave label>", "n": 512}, ...]
 - In EACH persona, add:
-    "wave_sizes": [
-      {"wave": "<wave1 label>", "count": 180, "pct": 35.2},
-      {"wave": "<wave2 label>", "count": 150, "pct": 30.7}
-    ],
-    "shift": "one sentence on how this persona changed between waves, stating the point delta"
-- Top level "shifts_summary": [
-    {"persona": "The Social Scroller", "wave1_pct": 35.2, "wave2_pct": 30.7,
-     "delta_pts": -4.5, "direction": "shrinking", "note": "what it means for ad budget over time"}
-  ]
-Keep the SAME personas (identical names, colors, definitions) across both waves; only their
-sizes, stats, and emphasis change. `size_count`/`size_pct` should reflect the COMBINED dataset."""
+    "wave_sizes": [{"wave": "<wave label>", "count": 180, "pct": 35.2}, ...]   // one per wave, in order
+    "shift": "one sentence on the trend across the waves, stating the first-to-last point delta"
+- Top level "shifts_summary": one entry per persona:
+    [{"persona": "The Social Scroller",
+      "by_wave": [{"wave": "<label>", "pct": 35.2}, ...],   // one per wave, in order
+      "delta_pts": -4.5,                                     // first wave to last wave
+      "direction": "rising" | "falling" | "stable",
+      "note": "what it means for ad budget over time"}]
+Keep the SAME personas (identical names, colors, definitions) across ALL waves; only their
+sizes, stats, and emphasis change. `size_count`/`size_pct` reflect the COMBINED dataset."""
 
 CHART_STYLE = """\
 import matplotlib
@@ -214,24 +212,26 @@ def build_task_prompt(
             df, dt = w.get("date_from"), w.get("date_to")
             rng = f"{df.date() if df else 'start'} to {dt.date() if dt else 'latest'}"
             wlines.append(f'  - "{w["label"]}": submitDate {rng}')
+        n_waves = len(waves)
         title_goal = "Wave-over-wave audience-shift report — analysis, then parallel rendering"
         wave_context = (
             "\n## WAVE-OVER-WAVE COMPARISON MODE\n"
-            "This Excel combines TWO time periods of the SAME survey, tagged by a `wave` column:\n"
+            f"This Excel combines {n_waves} time periods (waves) of the SAME survey, tagged by a "
+            "`wave` column (use these EXACT labels, they are in time order):\n"
             + "\n".join(wlines)
             + "\nYour report COMPARES the audience across these waves: build ONE consistent set of "
             "personas, size each WITHIN each wave, and quantify how the audience shifted over time. "
             "Apply STEP 0 filtering within each wave.\n"
         )
         persona_step_extra = (
-            " Define the personas ONCE on the combined dataset (so they are identical across "
+            " Define the personas ONCE on the combined dataset (so they are identical across all "
             "waves), then compute each persona's size and key stats SEPARATELY within each wave."
         )
         schema_block = PERSONAS_SCHEMA + "\n\n" + WAVE_SCHEMA_ADDENDUM
         chart_extra = (
             "\n   Make the `overview_chart` a GROUPED bar chart comparing every persona's % across "
-            "the two waves (one group per persona, one bar per wave). Per-persona charts should show "
-            "their key metric changing between waves."
+            f"all {n_waves} waves (one group per persona, one bar per wave in time order). Per-persona "
+            "charts should show their key metric changing across the waves."
         )
         shift_step = (
             "\n## STEP 4b — QUANTIFY THE SHIFT\n"

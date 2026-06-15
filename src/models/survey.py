@@ -36,3 +36,7 @@ class SurveyDetail(BaseModel):
     date_bounds: dict[str, str | None] | None = Field(
         default=None, description="Min/max submitDate over the eligible cohort, for the date picker"
     )
+    wave_capable: bool = Field(default=False, description="True when the survey has 2+ collection waves (gaps in the submission timeline)")
+    detected_waves: list[dict] | None = Field(
+        default=None, description="Detected waves: [{label, period, date_from, date_to, n}], time-ordered"
+    )

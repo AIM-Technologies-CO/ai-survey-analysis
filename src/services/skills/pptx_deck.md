@@ -54,17 +54,18 @@ pre-rendered `work/charts/*.png`. Follow the shared design system exactly.
    Georgia 16pt #E8ECF4. Place the overview chart PNG right half if it fits.
 3b. **Audience shift** (ONLY if personas.json has `waves`) — chrome; insert BETWEEN Audience
    overview and the persona slides (eyebrow numbers after it shift by one). A `shifts_summary`
-   table: header `PERSONA | {wave1}% | {wave2}% | Δ PTS | WHAT IT MEANS` (small-caps muted on
-   panel-alt); body rows Calibri 11pt, persona names in their colors; the Δ cell signed with
-   ▲ #00FF96 (growing) / ▼ #FF4D6D (shrinking) / muted dash (flat); one-line headline takeaway
-   as the kicker. (The grouped wave `overview_chart` already sits on the Audience overview slide.)
+   table: header `PERSONA | {wave1}% | … | {waveN}% | Δ PTS | WHAT IT MEANS` — one % column per
+   wave in time order (small-caps muted on panel-alt); body rows Calibri 11pt, persona names in
+   their colors; the Δ cell is the signed first-to-last change with ▲ #00FF96 (rising) /
+   ▼ #FF4D6D (falling) / muted dash (stable); one-line headline takeaway as the kicker. (The
+   grouped wave `overview_chart` already sits on the Audience overview slide.)
 4. **One slide per persona** — chrome with eyebrow `0N · PERSONA`; title = persona name
    Georgia 30pt in the PERSONA's color, kicker = tagline italic.
    SIZE badge top-right of content: `{pct}%` Georgia 26pt persona color + `{count}
    respondents` Calibri 9pt muted.
-   If `wave_sizes` is present, add a wave-shift line under the badge:
-   `{wave1} {pct}% → {wave2} {pct}%  (Δ +X.X ▲)` Calibri 10pt colored by direction
-   (#00FF96 up / #FF4D6D down), with the persona's `shift` sentence as a 9pt #8A93B0 line.
+   If `wave_sizes` is present, add a wave-shift line under the badge — the % series across all
+   waves with the net delta: `Wave 1 {pct}% · … · Wave N {pct}%  (Δ +X.X ▲)` Calibri 10pt colored
+   by direction (#00FF96 up / #FF4D6D down), with the persona's `shift` sentence as a 9pt #8A93B0 line.
    LEFT column (~55%): four blocks — label Calibri 10pt bold small-caps in persona
    color (DEMOGRAPHICS / BEHAVIORS / CONTENT PREFERENCES / AD RECEPTIVITY), bullets
    Calibri 12pt #E8ECF4, line_spacing 1.25, ≤ 4 bullets each, keep the numbers; thin

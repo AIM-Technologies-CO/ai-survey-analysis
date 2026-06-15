@@ -34,6 +34,7 @@ def survey_detail(survey_id: str):
         usable = data.count_eligible(survey_id, include_all=True)
         questions = data.get_survey_questions(survey_id)
         bounds = data.submit_date_bounds(survey_id)
+        waves = data.detect_waves(survey_id)
     except KeyError:
         raise HTTPException(404, "survey not found")
     except PyMongoError as e:
@@ -58,6 +59,8 @@ def survey_detail(survey_id: str):
         ),
         candidate_labels=labels,
         date_bounds=bounds,
+        wave_capable=waves["wave_capable"],
+        detected_waves=waves["waves"],
     )
 
 
@@ -189,9 +192,10 @@ async def start_run(req: RunRequest):
             raise HTTPException(503, "database unavailable") from e
 
         if req.waves:
-            if len(req.waves) != 2:
-                raise HTTPException(400, "Wave-over-wave needs exactly two waves")
+            if len(req.waves) < 2:
+                raise HTTPException(400, "Wave-over-wave needs at least two waves")
             waves_parsed = []
+            seen_labels: dict[str, int] = {}
             for i, w in enumerate(req.waves):
                 try:
                     wf = data.parse_submit_date(w.date_from)
@@ -206,10 +210,13 @@ async def start_run(req: RunRequest):
                 if n == 0:
                     raise HTTPException(400, f"Wave '{w.label}' has no eligible respondents in that range")
                 label = (w.label or "").strip() or f"Wave {i + 1}"
+                # the `wave` column needs distinct values — suffix any duplicate label
+                if label in seen_labels:
+                    seen_labels[label] += 1
+                    label = f"{label} ({seen_labels[label]})"
+                else:
+                    seen_labels[label] = 1
                 waves_parsed.append({"label": label, "date_from": wf, "date_to": wt})
-            # the wave column needs distinct values
-            if waves_parsed[0]["label"] == waves_parsed[1]["label"]:
-                waves_parsed[1]["label"] += " (2)"
         else:
             try:
                 date_from = data.parse_submit_date(req.date_from)

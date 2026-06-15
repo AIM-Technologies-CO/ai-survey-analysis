@@ -135,41 +135,31 @@
       <h2><span class="step">2</span> Configure the run</h2>
       <div id="seg-counts" class="seg-counts"></div>
 
-      <div id="seg-timescope" class="hidden">
-        <p class="seg-lbl" style="margin:0 0 6px;">Time scope</p>
+      <div id="seg-scopebar" class="hidden">
+        <p class="seg-lbl" style="margin:0 0 6px;">Time scope <span class="seg-wave-badge">multiple waves detected</span></p>
         <div class="seg-modes">
           <button type="button" class="seg-mode seg-scope active" data-scope="single">Single snapshot</button>
-          <button type="button" class="seg-mode seg-scope" data-scope="waves">Compare two waves</button>
+          <button type="button" class="seg-mode seg-scope" data-scope="waves">Compare waves</button>
         </div>
+      </div>
 
-        <div id="seg-datefilter" class="seg-datefilter" style="margin-top:10px;">
-          <div class="filter-group">
-            <label class="seg-lbl" for="seg-date-from">From</label>
-            <input id="seg-date-from" type="date" />
-          </div>
-          <div class="filter-group">
-            <label class="seg-lbl" for="seg-date-to">To</label>
-            <input id="seg-date-to" type="date" />
-          </div>
-          <label class="chk"><input type="checkbox" id="seg-include-all" /> include all dates</label>
-          <span class="meta" id="seg-eligible-meta"></span>
+      <div id="seg-datefilter" class="seg-datefilter hidden">
+        <div class="filter-group">
+          <label class="seg-lbl" for="seg-date-from">From</label>
+          <input id="seg-date-from" type="date" />
         </div>
+        <div class="filter-group">
+          <label class="seg-lbl" for="seg-date-to">To</label>
+          <input id="seg-date-to" type="date" />
+        </div>
+        <label class="chk"><input type="checkbox" id="seg-include-all" /> include all dates</label>
+        <span class="meta" id="seg-eligible-meta"></span>
+      </div>
 
-        <div id="seg-wavefilter" class="hidden" style="margin-top:10px;">
-          <div class="seg-wave">
-            <span class="seg-wave-tag">Wave 1</span>
-            <div class="filter-group"><label class="seg-lbl">From</label><input id="seg-w1-from" type="date" /></div>
-            <div class="filter-group"><label class="seg-lbl">To</label><input id="seg-w1-to" type="date" /></div>
-            <span class="meta" id="seg-w1-meta"></span>
-          </div>
-          <div class="seg-wave">
-            <span class="seg-wave-tag">Wave 2</span>
-            <div class="filter-group"><label class="seg-lbl">From</label><input id="seg-w2-from" type="date" /></div>
-            <div class="filter-group"><label class="seg-lbl">To</label><input id="seg-w2-to" type="date" /></div>
-            <span class="meta" id="seg-w2-meta"></span>
-          </div>
-          <p class="hint" style="margin:6px 0 0;">One persona set, sized in both periods — the report shows how each segment grew or shrank.</p>
-        </div>
+      <div id="seg-wavefilter" class="hidden">
+        <p class="seg-lbl" style="margin:0 0 6px;">Select waves to compare (2 or more)</p>
+        <div id="seg-wave-list" class="seg-wave-list"></div>
+        <p class="hint" style="margin:6px 0 0;">One persona set, sized in every selected wave — the report shows how each segment grew or shrank over time.</p>
       </div>
 
       <p class="hint">Choose how to build the segments. Filters are applied automatically:

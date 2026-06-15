@@ -508,3 +508,66 @@ def submit_date_bounds(survey_id: str) -> dict:
     ], allowDiskUse=True))
     row = res[0] if res else {}
     return {"min": jsonable(row.get("min")), "max": jsonable(row.get("max"))}
+
+
+def _period_label(a: datetime, b: datetime) -> str:
+    """Human period for a wave, e.g. 'Jun 29 to Jul 2, 2025' or 'Jan 2024 to Mar 2025'. No em dashes."""
+    if a.year == b.year:
+        if a.month == b.month and a.day == b.day:
+            return f"{a:%b} {a.day}, {a.year}"
+        return f"{a:%b} {a.day} to {b:%b} {b.day}, {a.year}"
+    return f"{a:%b} {a.day}, {a.year} to {b:%b} {b.day}, {b.year}"
+
+
+def detect_waves(survey_id: str, *, gap_days: int = 21) -> dict:
+    """Detect collection waves from gaps in the submission timeline.
+
+    Groups eligible submissions by day, then splits into clusters wherever there is a
+    gap longer than ``gap_days`` with no submissions. Clusters too small to be a real
+    wave (< max(15, 2% of total)) are dropped. Returns
+    ``{"wave_capable": bool, "waves": [{"label","period","date_from","date_to","n"}]}``
+    (dates are 'YYYY-MM-DD'); a survey collected in one continuous stretch yields one
+    cluster and ``wave_capable=False``."""
+    match = _eligible_match(survey_id, include_all=True)
+    agg = get_db().respondents.aggregate([
+        {"$match": match},
+        {"$group": {"_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$submitDate"}}, "n": {"$sum": 1}}},
+        {"$sort": {"_id": 1}},
+    ], allowDiskUse=True)
+    days = []
+    for r in agg:
+        if not r.get("_id"):
+            continue
+        try:
+            days.append((datetime.strptime(r["_id"], "%Y-%m-%d"), int(r["n"])))
+        except (ValueError, TypeError):
+            continue
+
+    if not days:
+        return {"wave_capable": False, "waves": []}
+
+    clusters: list[dict] = []
+    for day, n in days:
+        if clusters and (day - clusters[-1]["last"]).days > gap_days:
+            clusters.append({"first": day, "last": day, "n": n})
+        elif clusters:
+            clusters[-1]["last"] = day
+            clusters[-1]["n"] += n
+        else:
+            clusters.append({"first": day, "last": day, "n": n})
+
+    total = sum(n for _, n in days)
+    threshold = max(15, int(0.02 * total))
+    sig = [c for c in clusters if c["n"] >= threshold]
+
+    waves = [
+        {
+            "label": f"Wave {i + 1}",
+            "period": _period_label(c["first"], c["last"]),
+            "date_from": c["first"].strftime("%Y-%m-%d"),
+            "date_to": c["last"].strftime("%Y-%m-%d"),
+            "n": c["n"],
+        }
+        for i, c in enumerate(sig)
+    ]
+    return {"wave_capable": len(waves) >= 2, "waves": waves}

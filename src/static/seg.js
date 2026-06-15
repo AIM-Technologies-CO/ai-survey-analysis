@@ -4,7 +4,7 @@
   const MIN_Q = 3;
   const segState = {
     source: "mongo", ref: null, selected: new Set(), mode: "ai", aiPlan: null,
-    compareWaves: false,
+    compareWaves: false, waveCapable: false, detectedWaves: [],
     jobId: null, lastIdx: 0, timer: null, loaded: false, recountTimer: null,
   };
 
@@ -129,6 +129,8 @@
       const d = await api(`/api/segmentation/surveys/${sv.id}`);
       segState.ref = d.id;
       segState.dateBounds = d.date_bounds || null;
+      segState.waveCapable = !!d.wave_capable;
+      segState.detectedWaves = d.detected_waves || [];
       $("#seg-source-status").innerHTML = "";
       renderCounts(d.counts);
       renderLabels(d.candidate_labels);
@@ -263,40 +265,43 @@
     }
   }
 
-  // ---- time scope: single date filter OR two-wave comparison (mongo only) ----
+  // ---- time scope: single date filter OR multi-wave comparison (mongo only) ----
   function resetScopeToSingle() {
     segState.compareWaves = false;
     document.querySelectorAll(".seg-scope").forEach((x) => x.classList.toggle("active", x.dataset.scope === "single"));
-    $("#seg-datefilter").classList.remove("hidden");
+    $("#seg-datefilter").classList.toggle("hidden", segState.source !== "mongo");
     $("#seg-wavefilter").classList.add("hidden");
   }
 
   function initDateFilter() {
-    const scope = $("#seg-timescope");
-    if (segState.source !== "mongo") { scope.classList.add("hidden"); segState.compareWaves = false; return; }
-    scope.classList.remove("hidden");
+    const isMongo = segState.source === "mongo";
+    // The wave toggle appears ONLY when the survey actually has 2+ detected waves.
+    $("#seg-scopebar").classList.toggle("hidden", !(isMongo && segState.waveCapable));
+    if (!isMongo) { $("#seg-datefilter").classList.add("hidden"); $("#seg-wavefilter").classList.add("hidden"); segState.compareWaves = false; return; }
     resetScopeToSingle();
     const b = segState.dateBounds || {};
     const min = b.min ? b.min.slice(0, 10) : "", max = b.max ? b.max.slice(0, 10) : "";
-    const ids = ["seg-date-from", "seg-date-to", "seg-w1-from", "seg-w1-to", "seg-w2-from", "seg-w2-to"];
-    for (const id of ids) { const el = $("#" + id); if (min) el.min = min; if (max) el.max = max; }
+    for (const id of ["seg-date-from", "seg-date-to"]) { const el = $("#" + id); if (min) el.min = min; if (max) el.max = max; }
     $("#seg-date-from").value = min; $("#seg-date-to").value = max;
     $("#seg-include-all").checked = false;
-    seedWaveDefaults(min, max);
+    renderWaveList();
     recountEligible();
-    recountWave(1); recountWave(2);
   }
 
-  function seedWaveDefaults(min, max) {
-    // Split the full range at its midpoint: Wave 1 = earlier half, Wave 2 = later half.
-    let mid = "", nextDay = "";
-    if (min && max) {
-      const m = new Date((new Date(min).getTime() + new Date(max).getTime()) / 2);
-      mid = m.toISOString().slice(0, 10);
-      nextDay = new Date(new Date(mid).getTime() + 86400000).toISOString().slice(0, 10);
-    }
-    $("#seg-w1-from").value = min; $("#seg-w1-to").value = mid;
-    $("#seg-w2-from").value = nextDay || min; $("#seg-w2-to").value = max;
+  function renderWaveList() {
+    const root = $("#seg-wave-list");
+    root.innerHTML = segState.detectedWaves.map((w, i) =>
+      `<label class="seg-wave-item"><input type="checkbox" value="${i}" checked />` +
+      `<span class="ww-tag">${escapeHtml(w.label)}</span>` +
+      `<span class="ww-period">${escapeHtml(w.period || "")}</span>` +
+      `<span class="ww-n">${w.n} resp.</span></label>`).join("");
+    root.querySelectorAll("input").forEach((cb) => cb.addEventListener("change", updateSel));
+  }
+
+  function selectedWaves() {
+    return [...$("#seg-wave-list").querySelectorAll("input:checked")]
+      .map((cb) => segState.detectedWaves[+cb.value])
+      .filter(Boolean);
   }
 
   function recountEligible() {
@@ -320,27 +325,9 @@
     }, 300);
   }
 
-  async function recountWave(i) {
-    if (segState.source !== "mongo" || !segState.ref) return;
-    const f = $(`#seg-w${i}-from`).value, t = $(`#seg-w${i}-to`).value, meta = $(`#seg-w${i}-meta`);
-    if (!f && !t) { meta.textContent = ""; updateSel(); return; }
-    const p = new URLSearchParams({ include_all: "false" });
-    if (f) p.set("date_from", f);
-    if (t) p.set("date_to", t);
-    meta.textContent = "counting…";
-    try {
-      const d = await api(`/api/segmentation/surveys/${segState.ref}/eligible?${p.toString()}`);
-      meta.textContent = `${d.eligible} respondents`;
-    } catch (e) {
-      meta.textContent = "";
-    }
-    updateSel();
-  }
-
   function waveScopeOk() {
     if (!(segState.source === "mongo" && segState.compareWaves)) return true;
-    const has = (i) => !!($(`#seg-w${i}-from`).value || $(`#seg-w${i}-to`).value);
-    return has(1) && has(2);
+    return selectedWaves().length >= 2;
   }
 
   document.querySelectorAll(".seg-scope").forEach((b) => b.addEventListener("click", () => {
@@ -359,12 +346,14 @@
     $("#seg-date-to").disabled = on;
     recountEligible();
   });
-  [1, 2].forEach((i) => ["from", "to"].forEach((k) =>
-    $(`#seg-w${i}-${k}`).addEventListener("change", () => recountWave(i))));
 
   function showConfig() {
     $("#seg-config").classList.remove("hidden");
-    if (segState.source !== "mongo") $("#seg-timescope").classList.add("hidden");
+    if (segState.source !== "mongo") {
+      $("#seg-scopebar").classList.add("hidden");
+      $("#seg-datefilter").classList.add("hidden");
+      $("#seg-wavefilter").classList.add("hidden");
+    }
     resetAiPlan();  // a fresh survey/upload invalidates any previous AI plan
     updateSel();
     $("#seg-config").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -376,7 +365,7 @@
     if (!segState.ref) return;
     if (segState.mode === "manual" && segState.selected.size < MIN_Q) return;
     if (segState.mode === "ai" && !(segState.aiPlan && segState.aiPlan.length >= MIN_Q)) return;
-    if (!waveScopeOk()) { toast("Set a date range for both waves."); return; }
+    if (!waveScopeOk()) { toast("Select at least two waves to compare."); return; }
     const btn = $("#seg-run-btn");
     btn.disabled = true;
     btn.textContent = "Starting…";
@@ -395,10 +384,8 @@
         additional_details: $("#seg-details").value,
       };
       if (segState.source === "mongo" && segState.compareWaves) {
-        payload.waves = [1, 2].map((i) => ({
-          label: `Wave ${i}`,
-          date_from: $(`#seg-w${i}-from`).value || null,
-          date_to: $(`#seg-w${i}-to`).value || null,
+        payload.waves = selectedWaves().map((w) => ({
+          label: w.label, date_from: w.date_from, date_to: w.date_to,
         }));
       } else {
         const includeAll = segState.source !== "mongo" || $("#seg-include-all").checked;
