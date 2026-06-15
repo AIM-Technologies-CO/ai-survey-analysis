@@ -163,24 +163,41 @@
 
 /* ---------- label picker ---------- */
 .seg-lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; }
+/* question picker toolbar (filter + select all / clear) */
+.seg-qtools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 10px 0 8px; }
+.seg-q-search {
+  flex: 1; min-width: 170px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--text);
+  border-radius: 9px; padding: 8px 12px; font-size: 13px;
+}
+.seg-q-search::placeholder { color: var(--muted); }
+.seg-q-search:focus { outline: none; border-color: var(--gold-ink); }
+
 .seg-labels {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 4px;
-  max-height: 300px;
+  max-height: 320px;
   overflow-y: auto;
+  overflow-x: hidden;
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 12px;
+  padding: 10px;
   background: var(--bg);
 }
 .seg-litem {
-  display: flex; gap: 8px; align-items: flex-start;
-  padding: 6px 8px; border-radius: 7px; font-size: 13px; cursor: pointer;
+  display: flex; gap: 8px; align-items: center; min-width: 0;
+  padding: 7px 9px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  border: 1px solid transparent;
 }
 .seg-litem:hover { background: var(--gold-soft); }
-.seg-litem input { width: auto; min-width: 0; margin-top: 3px; accent-color: var(--gold-ink); }
-.seg-litem .lt { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; }
+.seg-litem:has(input:checked) { background: var(--gold-soft); border-color: var(--gold-line); }
+.seg-litem input { width: auto; min-width: 0; flex: none; accent-color: var(--gold-ink); }
+.seg-litem .li-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.seg-litem .lt {
+  flex: none; color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px;
+}
 
 /* ---------- progress log ---------- */
 .seg-log {

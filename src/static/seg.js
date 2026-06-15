@@ -3,7 +3,7 @@
 (function () {
   const MIN_Q = 3;
   const segState = {
-    source: "mongo", ref: null, selected: new Set(), mode: "ai", aiPlan: null,
+    source: "mongo", ref: null, selected: new Set(), allLabels: [], mode: "ai", aiPlan: null,
     compareWaves: false, waveMode: "date",
     gapCapable: false, detectedWaves: [],
     waveFamilyCapable: false, waveFamily: [],
@@ -179,39 +179,67 @@
     }
   }
 
-  // ---- labels ----
+  // ---- labels (manual question picker) ----
   function renderLabels(labels) {
     segState.selected.clear();
-    $("#seg-labels").innerHTML = labels.map((l) => {
-      const lbl = typeof l === "string" ? l : l.label;
-      const t = (l && l.type) ? `<span class="lt">${escapeHtml(l.type)}</span>` : "";
-      const tip = (l && l.question_text) ? escapeHtml(l.question_text) : "";
-      return `<label class="seg-litem" title="${tip}"><input type="checkbox" value="${escapeHtml(lbl)}"><span>${escapeHtml(lbl)} ${t}</span></label>`;
-    }).join("");
-    $("#seg-labels").querySelectorAll("input").forEach((cb) => {
-      cb.addEventListener("change", () => {
-        if (cb.checked) segState.selected.add(cb.value);
-        else segState.selected.delete(cb.value);
-        updateSel();
-      });
-    });
+    segState.allLabels = labels.map((l) => ({
+      label: typeof l === "string" ? l : l.label,
+      type: (l && l.type) || "",
+      text: (l && l.question_text) || "",
+    })).filter((l) => l.label);
+    $("#seg-q-search").value = "";
+    paintLabels("");
     updateSel();
   }
 
+  function paintLabels(filter) {
+    const f = (filter || "").trim().toLowerCase();
+    const items = (segState.allLabels || []).filter((l) =>
+      !f || l.label.toLowerCase().includes(f) || (l.text && l.text.toLowerCase().includes(f)));
+    const root = $("#seg-labels");
+    if (!items.length) {
+      root.innerHTML = `<div class="hint" style="margin:0;padding:8px">No questions match “${escapeHtml(f)}”.</div>`;
+      return;
+    }
+    root.innerHTML = items.map((l) => {
+      const checked = segState.selected.has(l.label) ? "checked" : "";
+      const t = l.type ? `<span class="lt">${escapeHtml(l.type)}</span>` : "";
+      const tip = l.text ? escapeHtml(l.text) : "";
+      return `<label class="seg-litem" title="${tip}"><input type="checkbox" value="${escapeHtml(l.label)}" ${checked} />` +
+             `<span class="li-name">${escapeHtml(l.label)}</span>${t}</label>`;
+    }).join("");
+    root.querySelectorAll("input").forEach((cb) => cb.addEventListener("change", () => {
+      if (cb.checked) segState.selected.add(cb.value);
+      else segState.selected.delete(cb.value);
+      updateSel();
+    }));
+  }
+
   function updateSel() {
-    const n = segState.selected.size;
-    const hint = n > 0 && n < MIN_Q ? ` (pick at least ${MIN_Q})` : "";
-    $("#seg-sel-count").textContent = `${n} selected${hint}`;
+    const n = segState.selected.size, total = (segState.allLabels || []).length;
+    const hint = n > 0 && n < MIN_Q ? ` · pick at least ${MIN_Q}` : "";
+    $("#seg-sel-count").textContent = total ? `${n} of ${total} selected${hint}` : `${n} selected${hint}`;
     const axisReady = segState.mode === "ai"
       ? !!(segState.aiPlan && segState.aiPlan.length >= MIN_Q)  // must preview the plan first
       : n >= MIN_Q;
     $("#seg-run-btn").disabled = !(segState.ref && axisReady && waveScopeOk());
   }
 
-  $("#seg-none").addEventListener("click", () => {
-    $("#seg-labels").querySelectorAll("input").forEach((cb) => { cb.checked = false; });
-    segState.selected.clear();
+  // Select all currently-visible (filtered) questions; Clear removes every selection.
+  $("#seg-all").addEventListener("click", () => {
+    $("#seg-labels").querySelectorAll("input").forEach((cb) => { cb.checked = true; segState.selected.add(cb.value); });
     updateSel();
+  });
+  $("#seg-none").addEventListener("click", () => {
+    segState.selected.clear();
+    $("#seg-labels").querySelectorAll("input").forEach((cb) => { cb.checked = false; });
+    updateSel();
+  });
+  let segQTimer = null;
+  $("#seg-q-search").addEventListener("input", (e) => {
+    clearTimeout(segQTimer);
+    const v = e.target.value;
+    segQTimer = setTimeout(() => paintLabels(v), 120);
   });
 
   // ---- segment-by mode (AI plan vs manual min-3) ----
