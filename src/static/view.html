@@ -345,6 +345,11 @@ function cqRow(q) {
       <textarea class="cq-options" readonly rows="${Math.max(2, (q.options || []).length)}">${esc((q.options || []).join("\n"))}</textarea>
     </div>` : ""}
     ${q.rationale ? `<div class="cq-rationale">✨ ${esc(q.rationale)}</div>` : ""}
+    ${q.source === "ai" ? (
+      (q.grounding && q.grounding.length)
+        ? `<div class="cq-grounding">🔗 grounded in: ${q.grounding.map(esc).join(", ")}</div>`
+        : `<div class="cq-grounding weak">⚠ weakly grounded — answers may rely on assumptions; review before generating</div>`
+    ) : ""}
   </div>`;
 }
 function renderWorkspace(rec) {

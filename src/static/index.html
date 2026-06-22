@@ -33,6 +33,7 @@
 <nav class="tabs" role="tablist">
   <button class="tab active" data-tab="panel-synth" role="tab">Synthetic Data</button>
   <button class="tab" data-tab="panel-seg" role="tab">Segmentation</button>
+  <button class="tab" data-tab="panel-backtest" role="tab">Validation</button>
 </nav>
 
 <main>
@@ -208,10 +209,92 @@
       <div id="seg-report-wrap" class="seg-report hidden"><iframe id="seg-report-frame" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe></div>
     </section>
   </div>
+
+  <!-- ============================ TAB: VALIDATION (BACKTEST) ============================ -->
+  <div id="panel-backtest" class="tab-panel">
+    <section class="card" id="bt-step-survey">
+      <h2><span class="step">1</span> Pick a survey</h2>
+      <p class="hint">Backtest the AI: feed it a subset of each respondent's real answers, let it predict the
+        rest, then compare the predictions to what they actually answered.</p>
+      <div class="row">
+        <input id="bt-survey-search" placeholder="search surveys by name…" />
+        <span class="meta" id="bt-survey-search-meta"></span>
+      </div>
+      <div id="bt-survey-list" class="grid"></div>
+    </section>
+
+    <section class="card hidden" id="bt-step-filter">
+      <h2><span class="step">2</span> Filter respondents</h2>
+      <p class="hint">Only <strong>submitted</strong>, non-excluded respondents are included. Optionally narrow by submit date.</p>
+      <div class="filter-row">
+        <div class="filter-group">
+          <label>From</label>
+          <input id="bt-date-from" type="date" />
+        </div>
+        <div class="filter-group">
+          <label>To</label>
+          <input id="bt-date-to" type="date" />
+        </div>
+        <label class="chk"><input type="checkbox" id="bt-include-all" /> include all dates</label>
+        <span class="meta" id="bt-eligible-meta"></span>
+        <button id="bt-apply-filter-btn" class="primary">Apply</button>
+      </div>
+    </section>
+
+    <section class="card hidden" id="bt-step-seed">
+      <h2><span class="step">3</span> Choose questions</h2>
+
+      <p class="bt-sublbl"><span class="bt-num">A</span> Questions fed to the AI (the persona)</p>
+      <p class="hint">Tick the questions whose real answers the AI is given to build the persona.</p>
+      <div class="seg-qtools">
+        <input id="bt-q-search" class="seg-q-search" type="text" placeholder="Filter questions…" />
+        <button type="button" id="bt-all" class="ghost">Select all</button>
+        <button type="button" id="bt-none" class="ghost">Clear</button>
+        <span class="meta" id="bt-sel-count"></span>
+      </div>
+      <div id="bt-seed-list" class="seg-labels"></div>
+
+      <div id="bt-predict-block" class="hidden" style="margin-top:18px;">
+        <p class="bt-sublbl"><span class="bt-num">B</span> Questions the AI should NOT answer</p>
+        <p class="hint">These are the remaining (held-out) questions — your seed questions are already excluded.
+          Tick any you do <strong>not</strong> want the AI to answer. Whatever stays unticked is predicted and
+          scored against the real answers.</p>
+        <div class="seg-qtools">
+          <button type="button" id="bt-restore-all" class="ghost hidden">Clear exclusions</button>
+          <span class="meta" id="bt-predict-count"></span>
+        </div>
+        <div id="bt-predict-list" class="seg-labels"></div>
+      </div>
+
+      <div class="row" style="margin-top: 14px;">
+        <span style="flex: 1"></span>
+        <button id="bt-preview-btn" class="primary">Preview on 10 →</button>
+      </div>
+    </section>
+
+    <section class="card hidden" id="bt-step-preview">
+      <h2><span class="step">4</span> Preview — sample of 10</h2>
+      <div id="bt-preview-meta" class="hint"></div>
+      <div id="bt-preview-area"></div>
+    </section>
+
+    <section class="card hidden" id="bt-step-generate">
+      <h2><span class="step">5</span> Run for all respondents</h2>
+      <p class="hint">Runs the backtest across the filtered cohort (capped for cost) and produces an Excel:
+        every respondent's seed answers, real vs AI-predicted held-out answers, and a match column with
+        per-respondent accuracy.</p>
+      <div class="row">
+        <button id="bt-generate-btn" class="primary">Run Backtest for All Respondents →</button>
+        <span class="meta" id="bt-generate-meta"></span>
+      </div>
+      <div id="bt-progress-area"></div>
+    </section>
+  </div>
 </main>
 
 <div id="toast" class="toast hidden"></div>
 <script src="/static/app.js"></script>
 <script src="/static/seg.js"></script>
+<script src="/static/backtest.js"></script>
 </body>
 </html>

@@ -235,6 +235,11 @@ function renderQuestions() {
         <textarea class="cq-options" data-id="${q.id}" placeholder="Option 1&#10;Option 2">${escapeHtml((q.options || []).join("\n"))}</textarea>
       </div>
       ${q.rationale ? `<div class="cq-rationale">✨ ${escapeHtml(q.rationale)}</div>` : ""}
+      ${q.source === "ai" ? (
+        (q.grounding && q.grounding.length)
+          ? `<div class="cq-grounding">🔗 grounded in: ${q.grounding.map(escapeHtml).join(", ")}</div>`
+          : `<div class="cq-grounding weak">⚠ weakly grounded — answers may rely on assumptions; review before generating</div>`
+      ) : ""}
     `;
     root.appendChild(row);
   }
@@ -323,7 +328,8 @@ async function suggestQuestions() {
       state.questions.push({
         id: state.nextId++, text: q.text, type: q.type,
         options: q.options && q.options.length ? q.options : ["", ""],
-        rationale: q.rationale || "", source: "ai", include: true,
+        rationale: q.rationale || "", grounding: q.grounding || [],
+        source: "ai", include: true,
       });
     }
     renderQuestions();

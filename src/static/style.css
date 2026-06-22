@@ -235,6 +235,17 @@ button.ghost:hover:not(:disabled) { color: var(--text); border-color: var(--gold
   padding: 7px 11px; border-radius: 0 7px 7px 0;
   font-style: italic;
 }
+.cq-grounding {
+  margin-top: 5px;
+  font-size: 11.5px; color: var(--muted);
+  background: var(--panel-2);
+  border-left: 3px solid #3a8;
+  padding: 6px 11px; border-radius: 0 7px 7px 0;
+}
+.cq-grounding.weak {
+  color: #b8860b;
+  border-left-color: #d8a200;
+}
 #suggest-count {
   background: var(--panel-2); padding: 8px 9px; border-radius: 9px; font-size: 12px;
 }
@@ -377,6 +388,57 @@ button.ghost:hover:not(:disabled) { color: var(--text); border-color: var(--gold
   min-width: 0; overflow-wrap: anywhere; max-width: 100%;
 }
 .chip-ref b { color: var(--gold-ink); font-weight: 600; }
+
+/* ---------- validation (backtest) comparison ---------- */
+.bt-acc {
+  margin-left: auto; font-size: 12px; font-weight: 600; color: var(--gold-ink);
+  background: var(--gold-soft); border: 1px solid var(--gold-line);
+  padding: 3px 10px; border-radius: 14px;
+}
+.bt-seclabel {
+  grid-column: 1 / -1; margin: 10px 2px 2px; padding-bottom: 4px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--gold-ink); border-bottom: 1px solid var(--gold-line);
+}
+.bt-seclabel:first-child { margin-top: 0; }
+.bt-seccount { color: var(--muted); font-weight: 600; }
+.bt-qlabel { border-bottom: 1px dotted var(--gold-line); cursor: help; }
+#panel-backtest .pv-qfull { white-space: pre-line; }  /* show choices one per line */
+
+/* step-3 sub-section labels (A: persona / B: exclude) */
+.bt-sublbl {
+  display: flex; align-items: center; gap: 8px;
+  margin: 4px 0 2px; font-size: 14px; font-weight: 600; color: var(--text);
+}
+.bt-num {
+  flex: none; width: 22px; height: 22px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--gold), var(--gold-2)); color: var(--ink);
+  font-size: 12px; font-weight: 700;
+}
+/* a ticked "AI should not answer" row reads as struck-out */
+.bt-exclitem:has(input:checked) .li-name { text-decoration: line-through; color: var(--muted); }
+.bt-cmps { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.bt-cmp {
+  border: 1px solid var(--line); border-left: 3px solid var(--line);
+  border-radius: 9px; padding: 11px 13px; background: var(--panel-2);
+}
+.bt-cmp.is-ok { border-left-color: var(--good); }
+.bt-cmp.is-bad { border-left-color: var(--bad); }
+.bt-cmp.is-na { border-left-color: var(--muted); }
+.bt-cmp-head { display: flex; align-items: flex-start; gap: 8px; }
+.bt-cmp-head .pv-gq { color: var(--text); font-weight: 500; flex: 1; overflow-wrap: anywhere; }
+.bt-cmp-head .pv-gq .qtype { color: var(--muted); font-weight: 400; font-size: 12px; }
+.bt-cmp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 9px; }
+.bt-lbl {
+  display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--muted); margin-bottom: 4px;
+}
+.bt-badge { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 12px; white-space: nowrap; }
+.bt-badge.bt-ok { color: var(--good); background: rgba(31, 157, 107, 0.13); border: 1px solid rgba(31, 157, 107, 0.4); }
+.bt-badge.bt-bad { color: var(--bad); background: rgba(194, 71, 63, 0.12); border: 1px solid rgba(194, 71, 63, 0.4); }
+.bt-badge.bt-na { color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); }
+@media (max-width: 560px) { .bt-cmp-cols { grid-template-columns: 1fr; } }
 
 /* ---------- step 5: progress + download ---------- */
 

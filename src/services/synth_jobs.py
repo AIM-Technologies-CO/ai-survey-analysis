@@ -112,3 +112,76 @@ def _run_job(job_id: str) -> None:
             job["state"] = "error"
             job["error"] = f"{type(e).__name__}: {e}"
             job["finished_at"] = time.time()
+
+
+# ---- backtest jobs (predict held-out answers, score vs real) --------------
+
+def start_backtest_job(survey_id, seed_qids, holdout_qs, filter_kwargs, *, eligible, session_id) -> dict:
+    """Create + launch a capped backtest job. Returns the public view.
+    Shares the _JOBS registry so the existing /api/jobs/{id}[/download] endpoints work."""
+    total = min(eligible, MAX_GENERATE_RESPONDENTS)
+    job = {
+        "id": uuid.uuid4().hex,
+        "survey_id": survey_id,
+        "state": "pending",
+        "done": 0, "ok": 0, "failed": 0,
+        "total": total,
+        "eligible": eligible,
+        "capped": total < eligible,
+        "file": None, "filename": None,
+        "error": None,
+        "per_errors": [],
+        "session_id": session_id,
+        "_seed_qids": seed_qids,
+        "_holdout": holdout_qs,
+        "_filter": filter_kwargs,
+        "started_at": time.time(), "finished_at": None,
+    }
+    _JOBS[job["id"]] = job
+    threading.Thread(target=_run_backtest_job, args=(job["id"],), daemon=True).start()
+    return _public(job)
+
+
+def _run_backtest_job(job_id: str) -> None:
+    job = _JOBS[job_id]
+    try:
+        with _LOCK:
+            job["state"] = "running"
+        docs = data.sample_eligible_capped(job["survey_id"], job["total"], **job["_filter"])
+        seed_qids = job["_seed_qids"]
+        holdout = job["_holdout"]
+        results: list = [None] * len(docs)
+
+        def work(i, doc):
+            try:
+                out = predictor.ask_backtest(job["survey_id"], doc, seed_qids, holdout)
+                return i, doc, out["answers"], None
+            except Exception as e:  # per-respondent failure: skip & continue
+                return i, doc, [], f"{type(e).__name__}: {e}"
+
+        with ThreadPoolExecutor(max_workers=GENERATE_WORKERS) as ex:
+            futures = [ex.submit(work, i, d) for i, d in enumerate(docs)]
+            for f in as_completed(futures):
+                i, doc, answers, err = f.result()
+                results[i] = (doc, answers, err)
+                with _LOCK:
+                    job["done"] += 1
+                    if err:
+                        job["failed"] += 1
+                        job["per_errors"].append({"respondent_id": str(doc.get("_id", "")), "error": err})
+                    else:
+                        job["ok"] += 1
+
+        path, fname = excelout.build_backtest_workbook(job["survey_id"], seed_qids, holdout, results)
+        with _LOCK:
+            job["state"] = "done"
+            job["file"] = str(path)
+            job["filename"] = fname
+            job["finished_at"] = time.time()
+        tracking.log(job["session_id"], job["survey_id"], "backtest_all_finished",
+                     {"job_id": job["id"], "ok": job["ok"], "failed": job["failed"], "file": fname})
+    except Exception as e:
+        with _LOCK:
+            job["state"] = "error"
+            job["error"] = f"{type(e).__name__}: {e}"
+            job["finished_at"] = time.time()

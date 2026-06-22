@@ -75,3 +75,81 @@ def build_workbook(survey_id: str, gen_questions: list[dict], results: list[tupl
     path = EXPORTS_DIR / fname
     wb.save(path)
     return path, fname
+
+
+def build_backtest_workbook(survey_id: str, seed_qids: set[int], holdout_qs: list[dict],
+                            results: list[tuple]) -> tuple[Path, str]:
+    """Backtest export. results: list of (respondent_doc, predicted_answers|[], error|None).
+
+    Sheet "Backtest": one row per respondent —
+      respondent_id | accuracy | <Seed: Q>… | per held-out Q: <Real: Q> | <[AI] Q> | <match: Q>
+    """
+    from services.backtest_service import compare_answer, option_aliases  # local import avoids a cycle
+
+    qmeta = {q.sqlQuestionId: q for q in data.get_survey_questions(survey_id)}
+    aliases_by_qid = {q["id"]: option_aliases(qmeta.get(q["id"])) for q in holdout_qs}
+    seed_cols = [(qid, (qmeta[qid].text or qmeta[qid].label or f"Q{qid}"))
+                 for qid in seed_qids if qid in qmeta]
+    hold_cols = [(q["id"], q.get("text") or f"Q{q['id']}", q["type"]) for q in holdout_qs]
+
+    header = ["respondent_id", "accuracy"]
+    header += [f"Seed: {t}" for _, t in seed_cols]
+    for _, t, _ty in hold_cols:
+        header += [f"Real: {t}", f"[AI] {t}", f"match: {t}"]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Backtest"
+    ws.append(header)
+
+    def real_vals(answered: dict, qid: int) -> list[str]:
+        entry = answered.get(qid)
+        if not entry:
+            return []
+        vals = [a.get("answer") or a.get("value") or "" for a in (entry.get("answers") or [])]
+        return [v for v in vals if v]
+
+    for doc, pred_answers, _err in results:
+        answered = data.respondent_answers_by_qid(doc)
+        pred_by_id = {a.get("id"): (a.get("answer") or []) for a in (pred_answers or [])}
+        row = [str(doc.get("_id", "")), ""]
+        for qid, _t in seed_cols:
+            row.append(", ".join(real_vals(answered, qid)))
+
+        matched = scored = 0
+        for qid, _t, qtype in hold_cols:
+            actual = real_vals(answered, qid)
+            predicted = pred_by_id.get(qid, [])
+            if actual:
+                cmp = compare_answer(qtype, predicted, actual, aliases_by_qid.get(qid))
+                if cmp["scored"]:
+                    scored += 1
+                    if cmp["match"]:
+                        matched += 1
+                        mark = "✓"
+                    else:
+                        mark = "✗"
+                else:
+                    mark = "—"  # open-ended, not scored
+            else:
+                mark = ""  # respondent never answered → no ground truth
+            row += [", ".join(actual), ", ".join(predicted), mark]
+        row[1] = f"{round(100 * matched / scored)}%" if scored else ""
+        ws.append(row)
+
+    ws.freeze_panes = "C2"
+    for col in range(1, len(header) + 1):
+        ws.column_dimensions[get_column_letter(col)].width = min(40, max(12, len(str(header[col - 1])) + 2))
+
+    errors = [(doc, err) for doc, _pa, err in results if err]
+    if errors:
+        es = wb.create_sheet("Errors")
+        es.append(["respondent_id", "error"])
+        for doc, err in errors:
+            es.append([str(doc.get("_id", "")), err])
+
+    EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    fname = f"backtest_{survey_id}_{int(time.time())}.xlsx"
+    path = EXPORTS_DIR / fname
+    wb.save(path)
+    return path, fname

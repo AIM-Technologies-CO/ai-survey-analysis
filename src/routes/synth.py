@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from pymongo.errors import PyMongoError
 
+from services import backtest_service as backtest
 from services import data, predictor, tracking
 from services import synth_service as synth
 
@@ -109,6 +110,38 @@ class GenerateAllRequest(BaseModel):
 @router.post("/generate-all")
 def generate_all(req: GenerateAllRequest):
     return _call(synth.start_generate_all, req.survey_id, req.questions,
+                 date_from=req.filter.date_from, date_to=req.filter.date_to,
+                 include_all=req.filter.include_all, session_id=req.session_id)
+
+
+class BacktestPreviewRequest(BaseModel):
+    survey_id: str
+    filter: FilterSpec = FilterSpec()
+    seed_qids: list[int]
+    exclude_qids: list[int] = []
+    session_id: str | None = None
+
+
+@router.post("/backtest/preview")
+def backtest_preview(req: BacktestPreviewRequest):
+    return _call(backtest.run_backtest_preview, req.survey_id, req.seed_qids,
+                 exclude_qids=req.exclude_qids,
+                 date_from=req.filter.date_from, date_to=req.filter.date_to,
+                 include_all=req.filter.include_all, session_id=req.session_id)
+
+
+class BacktestGenerateRequest(BaseModel):
+    survey_id: str
+    filter: FilterSpec = FilterSpec()
+    seed_qids: list[int]
+    exclude_qids: list[int] = []
+    session_id: str | None = None
+
+
+@router.post("/backtest/generate-all")
+def backtest_generate_all(req: BacktestGenerateRequest):
+    return _call(backtest.start_backtest_all, req.survey_id, req.seed_qids,
+                 exclude_qids=req.exclude_qids,
                  date_from=req.filter.date_from, date_to=req.filter.date_to,
                  include_all=req.filter.include_all, session_id=req.session_id)
 
