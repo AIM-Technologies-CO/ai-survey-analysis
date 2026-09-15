@@ -20,6 +20,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from mcp_app import mcp, build_mcp_asgi_app
+from mcp_auth import provider as oauth_provider
+from routes import oauth as oauth_routes
 from routes.health import router as health_router
 from routes.surveys import router as surveys_router
 from routes.synth import router as synth_router
@@ -34,13 +36,36 @@ STATIC_DIR = Path(__file__).parent / "static"
 mcp_asgi = build_mcp_asgi_app()  # import time: creates the session manager run below
 
 
+class McpPathNormalizer:
+    """Serve /mcp and /mcp/ identically. Starlette's Mount only matches "/mcp/..." and
+    answers a bare "/mcp" with a 307 to "/mcp/", which claude.ai's connector (and other
+    clients that normalise the URL) do not follow for POST — so rewrite the path
+    before routing instead of redirecting."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope.get("path") == "/mcp":
+            scope = dict(scope, path="/mcp/", raw_path=b"/mcp/")
+        await self.app(scope, receive, send)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings.ensure_dirs()
     logger.info("Survey Intelligence starting on port %s", settings.port)
     if not settings.mongo_url:
         logger.warning("SURVEY_MONGO_URL not set — database features will error until configured")
-    if not settings.mcp_auth_token:
+    if oauth_provider:
+        logger.info("/mcp/ auth: Google OAuth, domains=%s, issuer=%s, %d client(s) registered",
+                    ",".join(oauth_provider.allowed_domains), oauth_provider.base_url,
+                    oauth_provider.store.count("clients"))
+        if not oauth_provider.base_url.startswith("https://"):
+            logger.warning("PUBLIC_BASE_URL is not https — OAuth will only work for localhost testing")
+    elif settings.mcp_auth_token:
+        logger.warning("/mcp/ auth: legacy static token (set GOOGLE_OAUTH_CLIENT_ID/SECRET for Google login)")
+    else:
         logger.warning("MCP_AUTH_TOKEN not set — /mcp/ endpoint is unauthenticated")
     # a mounted sub-app's lifespan never runs, so drive the MCP session manager here
     async with mcp.session_manager.run():
@@ -49,14 +74,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Survey Intelligence", version="1.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(McpPathNormalizer)
 
 app.include_router(health_router)
 app.include_router(surveys_router)
 app.include_router(synth_router)
 app.include_router(segmentation_router)
 app.include_router(views_router)
+if oauth_provider:
+    oauth_routes.install(app, oauth_provider)  # /.well-known/*, /authorize, /token, /register, ...
 
-app.mount("/mcp", mcp_asgi)  # canonical endpoint /mcp/ (trailing slash)
+app.mount("/mcp", mcp_asgi)  # canonical endpoint /mcp/; bare /mcp is rewritten by McpPathNormalizer
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

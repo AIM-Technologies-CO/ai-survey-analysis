@@ -27,3 +27,6 @@ shared/
 # Misc
 node_modules/
 .DS_Store
+
+# Google OAuth client download — values live in .env
+client_secret_*.json

@@ -3,6 +3,10 @@
     cd src && MCP_AUTH_TOKEN=test123 uv run uvicorn server:app --port 8766   # terminal 1
     MCP_AUTH_TOKEN=test123 uv run scripts/mcp_smoke.py [--llm]               # terminal 2
 
+MCP_AUTH_TOKEN is sent as the Bearer token: the legacy static token, or — when the
+server runs Google OAuth — an access token obtained through a real login (e.g. from
+MCP Inspector) since this script cannot complete a browser sign-in itself.
+
 Checks the initialize handshake, the tool list (names + annotations), and the
 read-only Mongo-backed tools. --llm additionally calls suggest_questions (one
 real LLM call — set ANTHROPIC_MODEL=claude-haiku-4-5 on the server to keep it cheap).

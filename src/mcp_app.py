@@ -6,9 +6,13 @@ gunicorn must stay at workers=1). Tools are thin async wrappers over
 services/synth_service.py; blocking Mongo/Anthropic work runs in worker threads
 because FastMCP calls tools on the event loop.
 
-Auth: static token from MCP_AUTH_TOKEN, accepted as `Authorization: Bearer <t>`
-(Claude Code --header) or `?token=<t>` in the URL (claude.ai custom connectors
-only take a URL). Unset token == open endpoint, for localhost dev only.
+Auth (two modes, chosen by config):
+  * OAuth (GOOGLE_OAUTH_CLIENT_ID/SECRET set): standard MCP OAuth 2.1 — clients
+    register, the user signs in with a Google Workspace account from
+    MCP_ALLOWED_GOOGLE_DOMAINS, and every /mcp/ request carries one of OUR bearer
+    tokens (mcp_auth.py + routes/oauth.py). The static token is ignored.
+  * Legacy: static token from MCP_AUTH_TOKEN, accepted as `Authorization: Bearer <t>`
+    or `?token=<t>` in the URL. Unset token == open endpoint, for localhost dev only.
 """
 
 from __future__ import annotations
@@ -19,19 +23,45 @@ from typing import Any, Literal
 from urllib.parse import parse_qs
 
 import anyio.to_thread
+from mcp.server.auth.middleware.auth_context import get_access_token
+from mcp.server.auth.provider import ProviderTokenVerifier
+from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel
+from pydantic import AnyHttpUrl, BaseModel
 from pymongo.errors import PyMongoError
 
 from config import settings
+from mcp_auth import SCOPE, provider as oauth_provider
 from services import data, predictor, result_store
 from services import synth_jobs as jobs
 from services import synth_service as synth
 
-MCP_SESSION = "mcp"  # session_id used in tracking logs for MCP-originated actions
+MCP_SESSION = "mcp"  # tracking session_id prefix for MCP-originated actions
+
+
+def _actor() -> str:
+    """tracking session_id for the current call: "mcp:<email>" under OAuth, else "mcp".
+    Must be read on the event loop (inside the tool body), not in the worker thread."""
+    tok = get_access_token()
+    return f"{MCP_SESSION}:{tok.subject}" if tok and tok.subject else MCP_SESSION
+
+
+# Under OAuth the SDK enforces bearer auth inside the sub-app and adds the RFC 9728
+# resource_metadata hint to 401s; the AS endpoints themselves live at the site root
+# (routes/oauth.py) so discovery URLs are standard.
+_auth_kwargs: dict[str, Any] = {}
+if oauth_provider:
+    _auth_kwargs = dict(
+        token_verifier=ProviderTokenVerifier(oauth_provider),
+        auth=AuthSettings(
+            issuer_url=AnyHttpUrl(oauth_provider.base_url),
+            resource_server_url=AnyHttpUrl(f"{oauth_provider.base_url}/mcp"),
+            required_scopes=[SCOPE],
+        ),
+    )
 
 mcp = FastMCP(
     name="survey-synthetic-data",
@@ -59,6 +89,7 @@ mcp = FastMCP(
     # token auth replaces Host-header allowlisting; without this, requests via
     # tunnels/LAN are rejected by the localhost-only DNS-rebinding default
     transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+    **_auth_kwargs,
 )
 
 _READ_ONLY = ToolAnnotations(readOnlyHint=True)
@@ -134,7 +165,7 @@ async def count_eligible(survey_id: str, date_from: str | None = None,
     optionally filtered by submit date (YYYY-MM-DD, date_to is inclusive).
     Returns the eligible count and the per-job respondent cap."""
     return await _run(synth.eligible_count, survey_id, date_from=date_from,
-                      date_to=date_to, include_all=include_all, session_id=MCP_SESSION)
+                      date_to=date_to, include_all=include_all, session_id=_actor())
 
 
 @mcp.tool(annotations=_READ_LLM)
@@ -190,11 +221,13 @@ async def preview_synthetic_answers(survey_id: str, questions: list[AdHocQuestio
     user. Check that generated answers are grounded in each respondent's real ones.
     Returns view_url — the survey's live workspace page, now updated with a preview
     section (same link as before for this survey); share it with the user."""
+    actor = _actor()
+
     def run():
         qd = _qdicts(questions)
         out = synth.run_preview(survey_id, qd,
                                 date_from=date_from, date_to=date_to,
-                                include_all=include_all, session_id=MCP_SESSION)
+                                include_all=include_all, session_id=actor)
         out["view_url"] = _workspace(survey_id, "preview", out,
                                      merge_questions=[{**q, "source": "manual"} for q in qd])
         return out
@@ -211,11 +244,13 @@ async def generate_all(survey_id: str, questions: list[AdHocQuestion],
     Returns the job immediately; poll get_job_status with the returned id. Also
     returns view_url — the survey's live workspace page, now with a job-progress
     section and the Excel download once done (same link as before for this survey)."""
+    actor = _actor()
+
     def run():
         qd = _qdicts(questions)
         view = synth.start_generate_all(survey_id, qd,
                                         date_from=date_from, date_to=date_to,
-                                        include_all=include_all, session_id=MCP_SESSION)
+                                        include_all=include_all, session_id=actor)
         view["view_url"] = _workspace(survey_id, "job",
                                       {"job_id": view["id"],
                                        "filter": {"date_from": date_from, "date_to": date_to,
@@ -273,4 +308,6 @@ class TokenAuthMiddleware:
 def build_mcp_asgi_app():
     """The /mcp sub-app. Must be called at import time: it instantiates the session
     manager that server.py's lifespan then runs (mounted sub-app lifespans don't run)."""
+    if oauth_provider:
+        return mcp.streamable_http_app()  # bearer auth enforced by the SDK middleware
     return TokenAuthMiddleware(mcp.streamable_http_app(), settings.mcp_auth_token)

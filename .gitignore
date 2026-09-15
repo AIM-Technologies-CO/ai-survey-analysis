@@ -16,3 +16,10 @@ exports/
 tracking/
 app/exports/
 app/tracking/
+
+# MCP OAuth state (registered clients, hashed tokens)
+shared/_mcp_oauth.json
+shared/_mcp_oauth.tmp
+
+# Google OAuth client download — values live in .env
+client_secret_*.json

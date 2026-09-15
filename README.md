@@ -84,37 +84,69 @@ in-memory registry with the web UI. Tools: `list_surveys`, `get_survey_questions
 (capped; poll with `get_job_status`, which returns a `download_url` when done).
 Implementation: `src/mcp_app.py` + shared logic in `src/services/synth_service.py`.
 
-Env vars (see `.env.example`):
+### Authentication: Google sign-in (OAuth 2.1)
 
-- `MCP_AUTH_TOKEN` — shared secret; accepted as `Authorization: Bearer <t>` **or**
-  `?token=<t>` (claude.ai connectors can only carry the URL). Empty = open endpoint;
-  never deploy publicly without it.
-- `PUBLIC_BASE_URL` — public origin used in `download_url`, e.g.
-  `https://syntheticdata.ddns.net`.
+`/mcp/` is protected by a built-in OAuth 2.1 authorization server (`src/mcp_auth.py`,
+`src/routes/oauth.py`). Any MCP client that supports MCP auth (claude.ai connectors,
+Claude Code, MCP Inspector, …) discovers it automatically: dynamic client
+registration → the **user signs in with Google** → one-click consent → the client
+receives our own short-lived tokens. Only **verified Google Workspace accounts in
+`MCP_ALLOWED_GOOGLE_DOMAINS`** (default `aimtechnologies.co`) can complete the login;
+everyone else gets `access_denied`. Google tokens never reach the MCP client.
+
+One-time setup (Google Cloud Console → APIs & Services → Credentials):
+
+1. Create an **OAuth client ID**, type *Web application*.
+2. Authorized redirect URI: `https://syntheticdata.ddns.net/oauth/google/callback`
+   (`${PUBLIC_BASE_URL}/oauth/google/callback`).
+3. If the consent screen is *Internal* (Workspace only) nothing else is needed; if
+   *External*, publish it — the domain check is enforced by us regardless.
+4. Put the values in `.env` and restart:
+
+```bash
+PUBLIC_BASE_URL=https://syntheticdata.ddns.net
+GOOGLE_OAUTH_CLIENT_ID=....apps.googleusercontent.com
+GOOGLE_OAUTH_CLIENT_SECRET=GOCSPX-...
+MCP_ALLOWED_GOOGLE_DOMAINS=aimtechnologies.co
+```
+
+Endpoints (all at the site root; `PUBLIC_BASE_URL` is the issuer):
+`/.well-known/oauth-protected-resource[/mcp]`, `/.well-known/oauth-authorization-server`,
+`/authorize`, `/token`, `/register`, `/revoke`, `/oauth/google/callback`, `/oauth/consent`.
+State (registered clients, hashed tokens) persists in `shared/_mcp_oauth.json`
+(gitignored, 0600). Access tokens last `MCP_ACCESS_TOKEN_TTL` (1 h), refresh tokens
+`MCP_REFRESH_TOKEN_TTL` (30 d), rotated on use. Tracking events from authenticated
+Claude calls carry `session_id = "mcp:<email>"`, shown on `/activity`.
+
+Legacy fallback: when `GOOGLE_OAUTH_*` are unset, `MCP_AUTH_TOKEN` is accepted as
+`Authorization: Bearer <t>` **or** `?token=<t>` (empty = open endpoint; never deploy
+publicly like that). Under OAuth the static token and `?token=` are ignored.
 
 ### Connect from Claude Code
 
 ```bash
-claude mcp add --transport http synthetic-data https://syntheticdata.ddns.net/mcp/ \
-  --header "Authorization: Bearer $MCP_AUTH_TOKEN"
-# local dev: same command with http://localhost:8766/mcp/
+claude mcp add --transport http synthetic-data https://syntheticdata.ddns.net/mcp/
+# first use opens the browser: Google sign-in with your @aimtechnologies.co account
+# local dev / legacy token: add --header "Authorization: Bearer $MCP_AUTH_TOKEN"
 ```
 
 ### Connect from claude.ai (web)
 
-1. Deploy with `MCP_AUTH_TOKEN` and `PUBLIC_BASE_URL` set (public HTTPS is required —
+1. Deploy with `PUBLIC_BASE_URL` + `GOOGLE_OAUTH_*` set (public HTTPS is required —
    already satisfied by https://syntheticdata.ddns.net).
 2. claude.ai → **Settings → Connectors → Add custom connector** → URL:
-   `https://syntheticdata.ddns.net/mcp/?token=<MCP_AUTH_TOKEN>`
-   (trailing slash matters; leave the OAuth fields empty).
+   `https://syntheticdata.ddns.net/mcp/` (trailing slash matters; leave the OAuth
+   client ID/secret fields empty — claude.ai registers itself). Click **Connect** and
+   sign in with Google.
 3. In a chat, enable the connector via the search-and-tools menu, then e.g.:
    *“Find the Etisalat June survey, suggest 3 churn questions, preview them and tell
    me the projected cost.”*
 
-Security note: the token only guards `/mcp/` — the web UI and `/api/*` (including job
-downloads) remain unauthenticated, as before. Verify with
-`uv run python scripts/mcp_smoke.py` (add `--llm` for one cheap model call;
-set `ANTHROPIC_MODEL=claude-haiku-4-5` first).
+Security note: auth only guards `/mcp/` — the web UI and `/api/*` (including job
+downloads and `/view/*` pages) remain unauthenticated, as before. Verify with
+`uv run python scripts/mcp_smoke.py` (pass a valid OAuth access token, or the legacy
+token, as `MCP_AUTH_TOKEN`; add `--llm` for one cheap model call after setting
+`ANTHROPIC_MODEL=claude-haiku-4-5`).
 
 ## Notes / limitations (prototype)
 

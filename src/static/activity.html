@@ -92,13 +92,15 @@ function summarize(ev) {
   return bits.join(" · ") || esc(JSON.stringify(p));
 }
 function row(ev) {
-  const mcp = ev.session_id === "mcp";
+  const sid = String(ev.session_id || "");
+  const mcp = sid === "mcp" || sid.startsWith("mcp:");
+  const who = mcp ? (sid.includes(":") ? `Claude · ${sid.slice(4)}` : "Claude") : "Web UI";
   return `<div class="ev">
     <div class="ev-ts">${esc((ev.ts || "").replace("T", " ").replace("Z", " UTC"))}</div>
     <div>
       <div class="ev-top">
         <span class="ev-action">${esc(ACTIONS[ev.action] || ev.action)}</span>
-        <span class="ev-who ${mcp ? "mcp" : "web"}">${mcp ? "Claude" : "Web UI"}</span>
+        <span class="ev-who ${mcp ? "mcp" : "web"}">${esc(who)}</span>
       </div>
       <div class="ev-sum">${summarize(ev)}</div>
     </div></div>`;

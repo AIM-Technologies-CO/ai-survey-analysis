@@ -58,6 +58,21 @@ class Settings:
     # e.g. https://surveys.example.com — falls back to http://localhost:{port}
     public_base_url: str = field(default_factory=lambda: os.getenv("PUBLIC_BASE_URL", ""))
 
+    # MCP OAuth (Google Workspace login). Setting both GOOGLE_OAUTH_* values switches
+    # /mcp/ from the static token to OAuth 2.1 + Google sign-in restricted to
+    # MCP_ALLOWED_GOOGLE_DOMAINS (comma-separated). Requires PUBLIC_BASE_URL (https).
+    google_oauth_client_id: str = field(default_factory=lambda: os.getenv("GOOGLE_OAUTH_CLIENT_ID", ""))
+    google_oauth_client_secret: str = field(default_factory=lambda: os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", ""))
+    mcp_allowed_google_domains: tuple[str, ...] = field(default_factory=lambda: tuple(
+        d.strip().lower() for d in os.getenv("MCP_ALLOWED_GOOGLE_DOMAINS", "aimtechnologies.co").split(",")
+        if d.strip()))
+    mcp_access_token_ttl: int = field(default_factory=lambda: _get_int("MCP_ACCESS_TOKEN_TTL", 3600))
+    mcp_refresh_token_ttl: int = field(default_factory=lambda: _get_int("MCP_REFRESH_TOKEN_TTL", 30 * 86400))
+
+    @property
+    def mcp_oauth_enabled(self) -> bool:
+        return bool(self.google_oauth_client_id and self.google_oauth_client_secret)
+
     # Segmentation agent (Agent SDK)
     segmentation_model: str = field(default_factory=lambda: os.getenv("SEGMENTATION_MODEL", "claude-opus-4-8"))
     fallback_model: str = field(default_factory=lambda: os.getenv("FALLBACK_MODEL", "claude-opus-4-7"))
@@ -75,6 +90,11 @@ class Settings:
     uploads_dir: Path = field(default_factory=lambda: (PROJECT_ROOT / os.getenv("UPLOADS_DIR", "uploads")).resolve())
     logs_dir: Path = field(default_factory=lambda: (PROJECT_ROOT / "logs").resolve())
     shared_dir: Path = field(default_factory=lambda: (PROJECT_ROOT / os.getenv("SHARED_DIR", "shared")).resolve())
+
+    @property
+    def base_url(self) -> str:
+        """Public origin without trailing slash (PUBLIC_BASE_URL or localhost)."""
+        return (self.public_base_url or f"http://localhost:{self.port}").rstrip("/")
 
     def ensure_dirs(self) -> None:
         for d in (self.runs_dir, self.uploads_dir, self.logs_dir, self.shared_dir):

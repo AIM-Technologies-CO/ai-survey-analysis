@@ -53,7 +53,8 @@ def get_activity(limit: int = Query(100, ge=1, le=500), session_id: str | None =
             ev = json.loads(line)
         except ValueError:
             continue
-        if session_id and ev.get("session_id") != session_id:
-            continue
+        sid = str(ev.get("session_id") or "")
+        if session_id and sid != session_id and not (session_id == "mcp" and sid.startswith("mcp:")):
+            continue  # "mcp" also matches "mcp:<email>" (OAuth-authenticated Claude calls)
         events.append(ev)
     return {"events": events}
