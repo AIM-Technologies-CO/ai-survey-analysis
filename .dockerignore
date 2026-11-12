@@ -30,3 +30,9 @@ node_modules/
 
 # Google OAuth client download — values live in .env
 client_secret_*.json
+
+# Review/reference files dropped in the repo root (templates are built into src/services/skills/template)
+/*.pptx
+/*.xlsx
+/*.docx
+/*.png

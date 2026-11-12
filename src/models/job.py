@@ -47,5 +47,6 @@ class JobStatusResponse(BaseModel):
     num_turns: int = 0
     report_url: str | None = None
     pptx_url: str | None = None
+    pdf_url: str | None = None
     created_at: float
     updated_at: float

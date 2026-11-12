@@ -84,10 +84,18 @@ def _summarize_tool_input(name: str | None, ti: dict) -> str:
         sub = (ti.get("subagent_type") or "").lower()
         if "html" in sub:
             return "Handing off to the report designer to build the HTML report"
+        if "review" in sub:
+            return "Handing off to the independent reviewer to check every page"
         if "pptx" in sub or "deck" in sub:
             return "Handing off to the deck designer to build the PowerPoint"
         return "Handing work to a specialist builder"
     return f"Working… ({name})" if name else "Working…"
+
+
+def _final_qa(run_dir: Path, pptx: Path) -> dict:
+    from services.skills import check_report
+    return {"personas": check_report.check_personas(run_dir), "pptx": check_report.check_pptx(pptx),
+            "html": check_report.check_html(run_dir / "report.html", run_dir)}
 
 
 async def run_segmentation(
@@ -171,9 +179,10 @@ async def run_segmentation(
         permission_mode="bypassPermissions",
         model=settings.segmentation_model,
         fallback_model=settings.fallback_model,
-        effort="high",
-        max_turns=settings.max_turns,
-        max_budget_usd=settings.max_budget_usd,
+        effort=settings.segmentation_effort,
+        # 0 in config = unlimited -> pass None so the SDK applies no cap.
+        max_turns=settings.max_turns or None,
+        max_budget_usd=settings.max_budget_usd or None,
         env=agent_env,
         hooks={
             "PreToolUse": [HookMatcher(matcher=None, hooks=[pre_tool_hook])],
@@ -229,11 +238,15 @@ async def run_segmentation(
         )
         return result
 
+    # 0 in config = no wall-clock timeout.
+    timeout = settings.run_timeout_seconds or None
+
     # --- run ---
     await emit("status", "Running segmentation agent…")
-    logger.info("Run %s started (model=%s)", run_id, settings.segmentation_model)
+    logger.info("Run %s started (model=%s, effort=%s)", run_id, settings.segmentation_model,
+                settings.segmentation_effort)
     try:
-        await asyncio.wait_for(drive(task_prompt, options), timeout=settings.run_timeout_seconds)
+        await asyncio.wait_for(drive(task_prompt, options), timeout=timeout)
     except asyncio.TimeoutError:
         return await finalize(RunStatus.timed_out, f"wall-clock timeout ({settings.run_timeout_seconds}s)")
     except Exception as exc:
@@ -253,7 +266,7 @@ async def run_segmentation(
         )
         retry_opts = dataclasses.replace(options, resume=state["session_id"])
         try:
-            await asyncio.wait_for(drive(retry_prompt, retry_opts), timeout=settings.run_timeout_seconds)
+            await asyncio.wait_for(drive(retry_prompt, retry_opts), timeout=timeout)
         except Exception as exc:
             audit.append({"event": "retry_failed", "error": str(exc)})
         html_ok, pptx_ok = _artifacts_ok()
@@ -271,6 +284,15 @@ async def run_segmentation(
                                      f"(HTML {counts['html']}, PPTX {counts['pptx']}).")
         except Exception:
             logger.exception("dash sanitize failed for %s", run_id)
+        # Final deterministic QA (n>=30 rule, sorting, layout) — recorded, never blocks delivery.
+        try:
+            qa = await asyncio.to_thread(_final_qa, ws.run_dir, ws.report_pptx)
+            audit.append({"event": "final_qa", **qa})
+            n = len(qa["personas"]) + len(qa["pptx"]) + len(qa["html"])
+            await emit("status", "Final QA passed (sample-size rule, sorting, layout)." if not n
+                       else f"Final QA flagged {n} issue(s); see audit log.")
+        except Exception:
+            logger.exception("final QA failed for %s", run_id)
         return await finalize(RunStatus.succeeded, None)
     if state["subtype"] in _ERROR_SUBTYPES:
         err = f"agent ended with {state['subtype']}"

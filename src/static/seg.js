@@ -512,6 +512,8 @@
           }
           if (d.pptx_url) { $("#seg-dl-pptx").href = d.pptx_url; $("#seg-dl-pptx").style.display = ""; }
           else { $("#seg-dl-pptx").style.display = "none"; }
+          if (d.pdf_url) { $("#seg-dl-pdf").href = d.pdf_url; $("#seg-dl-pdf").style.display = ""; }
+          else { $("#seg-dl-pdf").style.display = "none"; }
           $("#seg-actions").classList.remove("hidden");
         } else if (d.status === "cancelled") {
           note($("#seg-run-status"), "info", `Run cancelled${cost}`);

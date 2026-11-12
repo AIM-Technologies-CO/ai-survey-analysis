@@ -3,7 +3,9 @@ start a run, poll, and serve the HTML report + PowerPoint."""
 
 from __future__ import annotations
 
+import re
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -22,6 +24,23 @@ logger = get_logger()
 
 _ALLOWED_EXT = (".xlsx", ".xls")
 _PPTX_MEDIA = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+_JOB_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _run_artifact(job_id: str, attr: str, filename: str) -> Path | None:
+    """Locate a finished run's output file.
+
+    The job registry is in-memory, so runs from before the last restart are
+    unknown to it. Their files still sit in runs/<job_id>/, so fall back there.
+    """
+    state = job_registry.get_job(job_id)
+    path = getattr(state, attr, None) if state else None
+    if path and path.exists():
+        return path
+    if not _JOB_ID_RE.match(job_id):
+        return None
+    path = settings.runs_dir / job_id / filename
+    return path if path.is_file() else None
 
 
 # ---------- DB survey detail (counts + candidate labels) -------------------
@@ -249,6 +268,8 @@ async def start_run(req: RunRequest):
 def _status_response(job_id: str, state, since: int = 0) -> JobStatusResponse:
     report_url = f"/api/segmentation/runs/{job_id}/report" if (state.report_path and state.report_path.exists()) else None
     pptx_url = f"/api/segmentation/runs/{job_id}/pptx" if (state.pptx_path and state.pptx_path.exists()) else None
+    pdf_path = state.pptx_path.with_suffix(".pdf") if state.pptx_path else None
+    pdf_url = f"/api/segmentation/runs/{job_id}/pdf" if (pdf_path and pdf_path.exists()) else None
     return JobStatusResponse(
         job_id=job_id,
         status=state.status,
@@ -258,6 +279,7 @@ def _status_response(job_id: str, state, since: int = 0) -> JobStatusResponse:
         num_turns=state.num_turns,
         report_url=report_url,
         pptx_url=pptx_url,
+        pdf_url=pdf_url,
         created_at=state.created_at,
         updated_at=state.updated_at,
     )
@@ -285,15 +307,23 @@ async def cancel_run(job_id: str):
 
 @router.get("/runs/{job_id}/report")
 def run_report(job_id: str):
-    state = job_registry.get_job(job_id)
-    if not state or not state.report_path or not state.report_path.exists():
+    path = _run_artifact(job_id, "report_path", "report.html")
+    if not path:
         raise HTTPException(404, "Report not available")
-    return FileResponse(str(state.report_path), media_type="text/html")
+    return FileResponse(str(path), media_type="text/html")
+
+
+@router.get("/runs/{job_id}/pdf")
+def run_pdf(job_id: str):
+    path = _run_artifact(job_id, "pdf_path", "report.pdf")
+    if not path:
+        raise HTTPException(404, "PDF not available")
+    return FileResponse(str(path), media_type="application/pdf", filename=f"segmentation_{job_id[:8]}.pdf")
 
 
 @router.get("/runs/{job_id}/pptx")
 def run_pptx(job_id: str):
-    state = job_registry.get_job(job_id)
-    if not state or not state.pptx_path or not state.pptx_path.exists():
+    path = _run_artifact(job_id, "pptx_path", "report.pptx")
+    if not path:
         raise HTTPException(404, "PowerPoint not available")
-    return FileResponse(str(state.pptx_path), media_type=_PPTX_MEDIA, filename=f"segmentation_{job_id[:8]}.pptx")
+    return FileResponse(str(path), media_type=_PPTX_MEDIA, filename=f"segmentation_{job_id[:8]}.pptx")

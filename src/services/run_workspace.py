@@ -120,6 +120,14 @@ def prepare_run_dir(
         encoding="utf-8",
     )
 
+    # Deterministic QA gate the agent + builders must pass (n>=30 rule, sorting, layout).
+    skills = Path(__file__).parent / "skills"
+    shutil.copyfile(skills / "check_report.py", run_dir / "check_report.py")
+    # AIM house template + helpers: the deck builder builds on the real AIM master.
+    shutil.copyfile(skills / "template" / "aim_deck.py", run_dir / "aim_deck.py")
+    shutil.copytree(skills / "template", run_dir / "template", dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns("aim_deck.py", "__pycache__"))
+
     ws.data_dictionary_text = _build_data_dictionary_md(input_xlsx, question_text)
     ws.data_dictionary_md.write_text(ws.data_dictionary_text, encoding="utf-8")
 

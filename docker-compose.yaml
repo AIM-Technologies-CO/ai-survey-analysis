@@ -10,7 +10,7 @@ services:
     restart: always
     mem_limit: 4G
     mem_reservation: 1G
-    # Published on localhost only — nginx (syntheticdata.ddns.net) proxies to 127.0.0.1:$PORT_NUMBER.
+    # Published on localhost only — nginx (syntheticdata.duckdns.org) proxies to 127.0.0.1:$PORT_NUMBER.
     ports:
       - "127.0.0.1:${PORT_NUMBER}:${PORT_NUMBER}"
     volumes:

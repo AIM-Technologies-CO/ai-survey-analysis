@@ -1,127 +1,104 @@
-# Survey Intelligence — Report Design System (shared by HTML + PPTX builders)
+# Audience Segmentation — Report Design System (shared by HTML + PPTX builders)
 
-Both deliverables follow the **AIM dark editorial** report language (the house style of
-AIM's flagship client decks): a deep-navy canvas, luminous accent colors, serif display
-typography with italic emphasis, and disciplined slide/section "chrome". They MUST look
-like two renditions of the same designed document: same palette, same type logic, same
-section order, same persona names/colors/numbers, and the SAME chart images.
+Both deliverables follow the **AIM house template** (the AIM "Research Report" deck):
+- a **gradient cover** (purple to teal, AIM logo, "Driven by Data. Delivered by AI.") and a
+  gradient **Thank-you** closing slide,
+- **light-blue content pages** (#CAEDFC) with bold navy titles, white rounded cards with a
+  thin navy border, navy card header strips, **key numbers in AIM red**, and a bottom
+  **takeaway bar** (navy rule + lightbulb icon + one bold-keyword sentence),
+- **navy pages** (#001847) for recommendations, with numbered circles, sky-blue headings and
+  the white AIM logo bottom-right.
 
-## Core tokens (use these exact values)
+The HTML and PPTX must look like two renditions of the same document: same palette, fonts,
+section order, persona names/colors/numbers, and the SAME chart images.
+
+## Tokens (exact values from the template)
 
 | Token | Hex | Use |
 | --- | --- | --- |
-| canvas | #0A0E27 | page / slide background (deep navy) |
-| panel | #121A4A | cards, chart panels |
-| panel-alt | #18225A | hover/alternate fills, table stripes |
-| text | #E8ECF4 | primary text |
-| dim | #A9B1CE | secondary text |
-| muted | #8A93B0 | captions, labels, axis text, footers |
-| rule | #1E285E | hairlines, borders, gridlines |
-| accent | #00FF96 | AIM signal green — eyebrows, key numbers, emphasis |
-| accent-2 | #00B4D0 | cyan — secondary accent |
-| warn | #FFD166 | cautions |
-| bad | #FF4D6D | negative callouts |
+| bg-light | #CAEDFC | content page background |
+| navy | #001847 | titles, body text, card borders, card header strips, navy pages |
+| navy-2 | #0B2E5C | small uppercase labels inside cards |
+| red | #E60000 | highlighted numbers ONLY (e.g. "57%" at the start of a stat) |
+| white | #FFFFFF | cards |
+| muted | #5A6B80 | notes, captions, footnotes, "how to read" lines |
+| head-pct | #9CC9E8 | the % that follows a card header ("FOOD & DRINKS 72%") |
+| sky | #8FD3F4 | headings on navy pages |
+| bar-dark / bar-light | #2F5597 / #5B9BD5 | chart series (two-group comparisons) |
 
-## Persona accent palette (assign in order, persona 1 → 6)
+## Fonts (the template's own)
 
-1. #00FF96 (green)  2. #B37BFF (purple)  3. #00D4F5 (cyan)
-4. #FFD166 (amber)  5. #FF6EC4 (pink)    6. #2BA8FF (blue)
+- Content pages: **Helvetica** everywhere (titles bold 22pt, body 10-12pt). Fallback stack in
+  HTML: `Helvetica, 'Helvetica Neue', Arial, sans-serif`.
+- Cover: **Avenir Black** (title), **Avenir** (survey name, bold), **Avenir Light** (date),
+  **Avenir Next Medium** (tagline). HTML: `Avenir, 'Avenir Next', 'Nunito Sans', Helvetica, sans-serif`.
+- Arabic strings: Tahoma (PPTX) / `dir="auto"` (HTML).
 
-Each persona keeps ITS color everywhere: card stripes and name accents in HTML, slide
-stripes/labels in PPTX, and its chart bars. Text placed ON a persona-color fill is
-always canvas (#0A0E27) for contrast. Never reassign colors between formats.
+## Persona palette (personas are sorted largest first; assign in order)
 
-## Typography
+1. #2F5597  2. #5B9BD5  3. #7B3FE4  4. #12A594  5. #E0A100  6. #0B2E5C
+Text on a persona fill: white on 1/3/4/6, navy on 2/5.
 
-- Display/headings: **Georgia** (serif). Emphasis words/lines in *italic* — often in
-  accent or persona color (e.g. cover second line, persona names).
-- Body/labels: HTML `'Segoe UI', Calibri, Arial, sans-serif`; PPTX **Calibri**.
-- Arabic strings: PPTX font **Tahoma** (shapes Arabic correctly); HTML add `dir="auto"`.
-- EYEBROWS / LABELS: 9-11px/pt uppercase, letter-spaced, bold, muted or accent.
-- Big numbers in Georgia, large (24-28pt), text or accent color.
+## Document structure (same order in both formats)
 
-## Section/slide "chrome" (every content section/slide)
+1. **Cover** (gradient): title (e.g. "Audience Segmentation"), survey name, one-line plain
+   subtitle, month + year. Never write "Survey Intelligence" anywhere.
+2. **Key findings** (light): 3 stat cards in a row (red number + navy line) for the strongest
+   `key_findings`, the rest as bullets in a white card; low-base note as a muted footnote:
+   "Not read (fewer than 30 respondents): ...". Takeaway bar = the single most important finding.
+3. **Methodology** (light): 4 stat cards (started / removed status / removed exclude / final N);
+   approach + limitations in a white card (limitations include the 30-respondent rule).
+4. **Audience overview** (light): 100% stacked size bar in persona colors, LARGEST FIRST, then a
+   light-grey (#B8C4D6) "Not profiled" segment from `not_profiled` so it always reaches 100%; every
+   segment labelled (inside if wide enough, otherwise above it); one white card per persona in
+   the same order with its name in its color, FULL tagline (never truncated, never "…") and
+   `{pct}% · {count}`; overview chart if it fits.
+5. **One page per persona** (light, size order): title = persona name; ONE subtitle line = `profile`
+   (qualitative, no numbers; the tagline is NOT repeated here); size badge top-right (`{pct}%` in persona color + count). The
+   persona's 2-3 `sections` as white cards with a navy header strip carrying the section's OWN
+   `title` (never fixed labels); EXACTLY one page per persona, nothing repeated on another page;
+   bullets with key numbers in red; when a bullet's `base` is smaller
+   than the persona size, show it after the bullet in small muted text "(n=37)". Charts in white cards with the
+   chart `title` as card header and the `how_to_read` line under the image in muted 8pt.
+   `profile_footnote` as a muted footnote above the takeaway bar. Takeaway bar = what makes
+   this persona different, in one sentence with **bold** keywords.
+6. **Summary table** (light): `summary_table.title`; columns EXACTLY as given; navy header row
+   with white text; white rows with thin #9CC9E8 rules; persona names bold in their color;
+   `source_note` as muted footnote.
+7. **What this suggests** (navy, ONLY if `recommendations`): numbered items, sky heading = the
+   recommendation, white bullet = "Based on: ...".
+8. **Thank-you** (template closing slide, unchanged).
 
-- Thin top hairline (rule color) across the content width.
-- **Eyebrow** top-left: `0N · SECTION NAME` — small caps, accent green, bold.
-- Top-right running header, muted small: `AIM TECHNOLOGIES · SURVEY INTELLIGENCE · {date}`.
-- **Title**: Georgia ~30pt/28px, text color.
-- **Kicker** under the title: one italic muted line stating the section's takeaway in
-  plain words (write a real insight, not a label).
-- Bottom hairline + footer: left `AIM Technologies · Confidential` · right `0N / Section`
-  — 8pt muted.
+## Wave-over-wave mode (ONLY when personas.json has a top-level `waves` field)
 
-## Canonical document structure (same order in both formats)
-
-1. **Cover** — canvas bg; accent green bar down the LEFT edge; "AIM TECHNOLOGIES" small
-   green bold + "Survey Intelligence · Audience Segmentation" muted; then a two-line
-   display title: line 1 Georgia ~64-72pt text color, line 2 Georgia *italic* in accent
-   green (e.g. "Inside the / Audience"); muted subtitle naming the survey + date; a row
-   of persona chips (panel cards: persona-color dot + name + size %); bottom meta strip
-   (hairline + 4 columns: PREPARED BY / SURVEY / RESPONDENTS / PERIOD — label 8pt muted
-   bold over value 11pt text bold).
-2. **01 · Methodology** — the filter funnel (started → removed by status → removed by
-   exclude → final N) as KPI stat cards or a ledger with big Georgia numbers; approach
-   paragraph; limitations in italic muted.
-3. **02 · Audience overview** — a manual **100% stacked size bar** (one row, segments in
-   persona colors, inline % labels in canvas-colored bold text) + the persona roster:
-   per persona a panel card with persona-color TOP stripe (≈4px/0.06in), name Georgia
-   italic in persona color, tagline muted, size count + % as a big Georgia figure;
-   include the overview chart image.
-4. **03+ · One section/slide per persona** (roster order). All six fields, always:
-   - Name + one-line tagline
-   - SIZE — count and % of filtered respondents
-   - DEMOGRAPHICS — defining profile with numbers
-   - BEHAVIORS — vs the overall population
-   - CONTENT PREFERENCES — media/platforms/content
-   - AD RECEPTIVITY — receptivity + placement implication (channel, format, angle)
-5. **Implications for ad placement** — cross-persona table: persona × (reach, best
-   channel, format, message angle); header row small caps muted; persona names in their
-   colors; row stripes panel/panel-alt.
-6. **Closing** — one-paragraph takeaway (Georgia, with one italic accent phrase) +
-   small-print recap.
-
-## Wave-over-wave mode (render ONLY when personas.json has a top-level `waves` field)
-
-This is a comparison of the SAME survey across **N time periods** (TWO OR MORE waves, given
-by the `waves` array in time order). When `waves` is present, adapt the document (and renumber
-sections after the insert):
-
-- **Cover** subtitle names every wave and its N in order, e.g.
-  `Survey · Wave 1 (n=512) → Wave 2 (n=488) → Wave 3 (n=460)`.
-- **Audience overview** — `overview_chart` is the GROUPED wave bar chart (one bar per wave per
-  persona, in time order); the kicker states the single biggest shift in plain words.
-- **NEW section "Audience shift"** (insert right AFTER Audience overview, before the persona
-  sections): render `shifts_summary` as a table with ONE % column PER WAVE (in time order),
-  then a final `Δ PTS` column (first wave to last) and `WHAT IT MEANS`:
-  `PERSONA | {wave1}% | {wave2}% | … | Δ PTS | WHAT IT MEANS`. Persona names in their color.
-  The Δ cell shows the signed first-to-last change with ▲ accent green (#00FF96) when rising,
-  ▼ #FF4D6D when falling, muted dash when stable. Lead with a one-line headline takeaway
-  (which segment moved most across the series).
-- **Each persona section** gains a **wave-shift line** from its `wave_sizes` — the % series
-  across all waves with the net delta, e.g. `Wave 1 35% · Wave 2 31% · Wave 3 28%  (Δ -7 pts ▼)`
-  colored by direction, with the persona's `shift` sentence as supporting copy.
-  Demographics/behaviors/etc. describe the COMBINED audience unless a bullet calls out a wave change.
-- Direction colors everywhere: up = #00FF96, down = #FF4D6D, flat = #8A93B0.
+- Cover subtitle names every wave and its N in order.
+- Audience overview: `overview_chart` is the grouped wave chart; subtitle states the biggest shift.
+- NEW light page "Audience shift" right after the overview: `shifts_summary` table
+  `PERSONA | {wave1}% | … | Δ PTS | WHAT IT MEANS`; Δ with ▲ #12A594 rising, ▼ #E60000 falling,
+  muted dash when stable.
+- Each persona page gains a wave-shift line from `wave_sizes` with the net delta.
 
 ## Inputs you read (never invent data)
 
-- `work/personas.json` — every number, name, tagline, bullet, and implication you render.
-  Fields: `report_title`, `survey_name`, `date`, `methodology` (`started`, `removed_status`,
-  `removed_exclude`, `final_n`, `approach`, `limitations`), `personas[]` (`name`, `tagline`,
-  `size_count`, `size_pct`, `color` hex, `demographics[]`, `behaviors[]`, `content[]`,
-  `ad_receptivity[]`, `placement` {`channel`,`format`,`angle`}, `charts[]` filenames),
-  `overview_chart`, `implications_summary`. In wave mode it ALSO has `waves`, per-persona
-  `wave_sizes` + `shift`, and `shifts_summary` (see "Wave-over-wave mode" above).
-- `work/charts/*.png` — pre-rendered dark-theme charts (panel background, persona colors).
-  Embed as-is (HTML: base64 data URIs; PPTX: insert the PNGs). Do NOT regenerate or restyle.
+- `work/personas.json`: `not_profiled` {count, pct, label, reason}, `report_title`, `survey_name`, `date`, `client_focus`, `methodology`,
+  `key_findings[]` ({text, base}), `low_base_notes[]`, `personas[]` (`name`, `tagline`,
+  `size_count`, `size_pct`, `color`, `profile`, `profile_footnote`, `sections[]` {title,
+  bullets[{text, base}]}, `charts[]` {file, title, how_to_read}), `overview_chart`,
+  `summary_table` {title, columns, rows, source_note}, optional `recommendations[]`
+  {text, based_on}. Wave mode adds `waves`, per-persona `wave_sizes` + `shift`, `shifts_summary`.
+- Render the `text` of claims. Show `base` as a small muted "(n=..)" ONLY when it is smaller than the
+  group it describes (a question asked of a subset); otherwise it stays in personas.json.
+- `work/charts/*.png`: pre-rendered charts in the AIM chart style. Embed as-is.
 
-## Quality bar
+## Layout rules (the #1 client complaint was overlapping and cut-off content)
 
-- Every claim carries its number from personas.json. No lorem, no placeholders.
-- Dark theme everywhere — no white flashes; charts sit on panel-colored cards so they blend.
-- Generous whitespace, strict alignment grid, bullets ≤ 14 words.
-- It must read like AIM's flagship client deck: premium, editorial, confident.
-- Copy punctuation: never use em dashes (—) or en dashes (–) in rendered text; use commas,
-  periods, colons, or parentheses instead. Hyphens in ranges like 18-24 are fine. If a
-  string in personas.json contains one, rewrite it without the dash when you render it.
+- NOTHING may overlap: no text over a chart, no card over the takeaway bar, nothing over a footer.
+- NOTHING may be cut off; never truncate with "…". If it does not fit: fewer words, a bigger
+  box, or a continuation page. Never below 9pt body text.
+- Images always fit inside their card keeping aspect ratio, at (close to) the size they were drawn.
+- No half-empty pages: content fills the page down to just above the footnote/takeaway bar.
+
+## Writing
+
+- Plain, simple English; short sentences; numbers carry the meaning.
+- Never use em dashes (—) or en dashes (–); use commas, colons, periods or parentheses.

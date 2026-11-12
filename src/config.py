@@ -74,11 +74,13 @@ class Settings:
         return bool(self.google_oauth_client_id and self.google_oauth_client_secret)
 
     # Segmentation agent (Agent SDK)
-    segmentation_model: str = field(default_factory=lambda: os.getenv("SEGMENTATION_MODEL", "claude-opus-4-8"))
-    fallback_model: str = field(default_factory=lambda: os.getenv("FALLBACK_MODEL", "claude-opus-4-7"))
-    max_turns: int = field(default_factory=lambda: _get_int("MAX_TURNS", 120))
-    max_budget_usd: float = field(default_factory=lambda: _get_float("MAX_BUDGET_USD", 8.0))
-    run_timeout_seconds: int = field(default_factory=lambda: _get_int("RUN_TIMEOUT_SECONDS", 1800))
+    segmentation_model: str = field(default_factory=lambda: os.getenv("SEGMENTATION_MODEL", "claude-opus-5-5"))
+    fallback_model: str = field(default_factory=lambda: os.getenv("FALLBACK_MODEL", "claude-opus-4-8"))
+    segmentation_effort: str = field(default_factory=lambda: os.getenv("SEGMENTATION_EFFORT", "medium"))
+    # Limits are OFF by default (0 = unlimited). Set a positive value to re-enable one.
+    max_turns: int = field(default_factory=lambda: _get_int("MAX_TURNS", 0))
+    max_budget_usd: float = field(default_factory=lambda: _get_float("MAX_BUDGET_USD", 0.0))
+    run_timeout_seconds: int = field(default_factory=lambda: _get_int("RUN_TIMEOUT_SECONDS", 0))
     max_concurrent_runs: int = field(default_factory=lambda: _get_int("MAX_CONCURRENT_RUNS", 2))
 
     # Inputs

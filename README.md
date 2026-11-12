@@ -97,14 +97,14 @@ everyone else gets `access_denied`. Google tokens never reach the MCP client.
 One-time setup (Google Cloud Console → APIs & Services → Credentials):
 
 1. Create an **OAuth client ID**, type *Web application*.
-2. Authorized redirect URI: `https://syntheticdata.ddns.net/oauth/google/callback`
+2. Authorized redirect URI: `https://syntheticdata.duckdns.org/oauth/google/callback`
    (`${PUBLIC_BASE_URL}/oauth/google/callback`).
 3. If the consent screen is *Internal* (Workspace only) nothing else is needed; if
    *External*, publish it — the domain check is enforced by us regardless.
 4. Put the values in `.env` and restart:
 
 ```bash
-PUBLIC_BASE_URL=https://syntheticdata.ddns.net
+PUBLIC_BASE_URL=https://syntheticdata.duckdns.org
 GOOGLE_OAUTH_CLIENT_ID=....apps.googleusercontent.com
 GOOGLE_OAUTH_CLIENT_SECRET=GOCSPX-...
 MCP_ALLOWED_GOOGLE_DOMAINS=aimtechnologies.co
@@ -125,7 +125,7 @@ publicly like that). Under OAuth the static token and `?token=` are ignored.
 ### Connect from Claude Code
 
 ```bash
-claude mcp add --transport http synthetic-data https://syntheticdata.ddns.net/mcp/
+claude mcp add --transport http synthetic-data https://syntheticdata.duckdns.org/mcp/
 # first use opens the browser: Google sign-in with your @aimtechnologies.co account
 # local dev / legacy token: add --header "Authorization: Bearer $MCP_AUTH_TOKEN"
 ```
@@ -133,9 +133,9 @@ claude mcp add --transport http synthetic-data https://syntheticdata.ddns.net/mc
 ### Connect from claude.ai (web)
 
 1. Deploy with `PUBLIC_BASE_URL` + `GOOGLE_OAUTH_*` set (public HTTPS is required —
-   already satisfied by https://syntheticdata.ddns.net).
+   already satisfied by https://syntheticdata.duckdns.org).
 2. claude.ai → **Settings → Connectors → Add custom connector** → URL:
-   `https://syntheticdata.ddns.net/mcp/` (trailing slash matters; leave the OAuth
+   `https://syntheticdata.duckdns.org/mcp/` (trailing slash matters; leave the OAuth
    client ID/secret fields empty — claude.ai registers itself). Click **Connect** and
    sign in with Google.
 3. In a chat, enable the connector via the search-and-tools menu, then e.g.:

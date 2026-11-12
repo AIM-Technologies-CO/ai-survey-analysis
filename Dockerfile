@@ -6,11 +6,14 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 # Node + the Claude Code CLI. The segmentation Agent SDK shells out to the `claude`
 # binary (claude_agent_sdk does shutil.which("claude")), so the CLI MUST be on PATH
 # inside the image. Node 22 + CLI pinned to the version proven on the host.
+# LibreOffice + poppler let the deck builder render slides to PNG and visually QA them.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ca-certificates \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
-    && npm install -g @anthropic-ai/claude-code@2.1.177 \
+    && npm install -g @anthropic-ai/claude-code@2.1.322 \
+    && apt-get install -y --no-install-recommends libreoffice-impress poppler-utils chromium \
+       fonts-liberation fonts-crosextra-carlito fonts-dejavu-core \
     && npm cache clean --force \
     && apt-get purge -y curl \
     && apt-get autoremove -y \

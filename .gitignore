@@ -23,3 +23,9 @@ shared/_mcp_oauth.tmp
 
 # Google OAuth client download — values live in .env
 client_secret_*.json
+
+# Review / reference files dropped in the repo root (not source)
+/*.xlsx
+/*.pptx
+/*.docx
+/*.png
